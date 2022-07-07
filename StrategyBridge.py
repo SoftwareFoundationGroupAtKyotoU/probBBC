@@ -55,9 +55,8 @@ class StrategyBridge:
         states : Set[int] = set(self.strategy.keys())
         new_state: Dict[State, float] = dict.fromkeys(states, 0.0)
         observation = StrategyBridge.__sort_observation(observation)
-        # うまいことadv.traを見ながら今いる状態の確率分布を得る
+
         for state, weight in self.current_state.items():
-            # こんな書き方はできないが、上手いベクトルの足し算のつもり
             # new_state += weight * self.next_state[state, action, observation]
             if (state, action, observation) in self.next_state:
                 dist = self.next_state[(state, action, observation)]
@@ -149,6 +148,7 @@ class StrategyBridge:
                 dist[s] = prob / prob_sum
             self.next_state[k] = dist
 
+    # observation (APを'__'で連結した文字列) をAPの辞書順で整列させる
     def __sort_observation(observation) -> Observation:
         obs_list = sorted(observation.split('__'))
         return "__".join(obs_list)

@@ -30,17 +30,15 @@ class MyModel(ABC):
 		self.cex_candidate = []
 		self.prob_bbc_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 		self.prob_bbc_socket.connect(socket_path)
-		self.prob_bbc_socket.send(pickle.dumps("Initialized MyModel (MV_python_integrator.py)\n"))
+		self.prob_bbc_socket.send(pickle.dumps({"print": "Initialized MyModel (MV_python_integrator.py)\n"}))
 
 	def setSimulatorForNewSimulation(self):
 		self.number_of_steps = 0
 		self.current_output = self.sul.pre()
 		self.strategy_bridge.reset()
-		self.prob_bbc_socket.send(pickle.dumps({"current_trace" : self.exec_trace}))
+		if len(self.exec_trace) > 0:
+			self.prob_bbc_socket.send(pickle.dumps({"trace" : self.exec_trace}))
 		self.exec_trace = []
-
-		# if len(self.cex_candidate) > 0:
-		# 	self.prob_bbc_socket.send(pickle.dumps({"cex_candidate" : self.cex_candidate}))
 		self.cex_candidate = []
 
 	def one_step(self):
@@ -55,8 +53,11 @@ class MyModel(ABC):
 		action = self.strategy_bridge.next_action()
 		self.current_output = self.sul.step(action)
 		# 実行列を保存
-		self.exec_trace.append((action, self.current_output))
+		self.exec_trace.append(action)
+		self.exec_trace.append(self.current_output)
 		ret = self.strategy_bridge.update_state(action, self.current_output)
+
+		# self.prob_bbc_socket.send(pickle.dumps({"print": f'one_step: {action}, {self.current_output}, {self.exec_trace}'}))
 
 		if not ret:
 				if len(self.cex_candidate) == 0:

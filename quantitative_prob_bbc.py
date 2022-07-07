@@ -16,9 +16,8 @@ aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarkin
 socket_path = '/tmp/multivesta.sock'
 example = 'shared_coin'
 
-# aalpy.utils.ModelCheckingの関数
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
-def evaluate_all_properties(prism_file_name, properties_file_name, prism_adv_path):
+def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
     import subprocess
     import io
     from os import path
@@ -46,7 +45,10 @@ def evaluate_all_properties(prism_file_name, properties_file_name, prism_adv_pat
     proc.kill()
     return results
 
-# MultiVeStAの実行
+def find_cex(sample, ot):
+    pass
+
+multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
 def execute_smc(prism_model_path, prism_adv_path):
     import os
     import socket
@@ -74,37 +76,46 @@ def execute_smc(prism_model_path, prism_adv_path):
 
     # MultiVeStAから呼び出されるモデルとの通信sokcetを読み出す
     def read_mv_python_integrator(conn, mask, ret):
-        data = conn.recv(16384)
+        data = conn.recv(32768)
         if len(data) > 0:
             try:
-                cex = pickle.loads(data)
-                print(f'MV_py: {cex}')
-                if "cex" in cex:
-                    ret.append(cex["cex"])
+                params = pickle.loads(data)
+                # print(f'MV_py: {cex}')
+                if "print" in params:
+                    print(f'MV_integrator: {params["print"]}')
+                if "trace" in params:
+                    ret['sample'].append(params["trace"])
+                if "cex" in params:
+                    ret['cex'].append(params["cex"])
             except pickle.UnpicklingError:
                 pass # TODO : dataを保存しておくか、バッファーを大きくする
+        return ret
 
     # MultiVeStAの標準出力を読み込む
     def read_multivesta(file, mask, ret):
         output = file.read1().decode('utf-8').rstrip()
+        for line in output.splitlines():
+            match = multivesta_output_regex.search(line)
+            if match:
+                ret['result'].append((match.group(1), match.group(2), match.group(3)))
         print(f'child: {output}')
         # MultiVeStAが終了しているか確認
         if proc.poll() != None:
             sel.modify(file, selectors.EVENT_READ, None)
+        return ret
 
     sel.register(connection, selectors.EVENT_READ, read_mv_python_integrator)
     sel.register(proc.stdout, selectors.EVENT_READ, read_multivesta)
 
     quit = False
-    ret = []
+    multivesta_ret = {'sample': [], 'cex': [], 'result': []}
     while True:
         for key, mask in sel.select():
             if key.data == None:
                 quit = True
             else:
                 callback = key.data
-                # retを返り値で変更するのも良い
-                callback(key.fileobj, mask, ret)
+                multivesta_ret = callback(key.fileobj, mask, multivesta_ret)
         if quit:
             break
 
@@ -122,13 +133,18 @@ def execute_smc(prism_model_path, prism_adv_path):
     s.close()
     sel.close()
 
-    if len(ret) > 0:
-        return ret[-1]
-    return None
+    if len(multivesta_ret['result']) == 0:
+        multivesta_ret['result'] = [(None,None,None)]
 
+    if len(multivesta_ret['cex']) > 0:
+        return multivesta_ret['sample'], multivesta_ret['cex'][-1], multivesta_ret['result'][0]
 
-class ProbBBCOracle(RandomWalkEqOracle) :
+    return multivesta_ret['sample'], None, multivesta_ret['result'][0]
+
+class ProbBBReachOracle(RandomWalkEqOracle) :
   def __init__(self, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09):
+    self.previous_strategy = None
+    self.current_strategy = None
     super().__init__(alphabet, sul=sul, num_steps=num_steps, reset_after_cex=reset_after_cex, reset_prob=reset_prob)
 
   def find_cex(self, hypothesis):
@@ -142,42 +158,47 @@ class ProbBBCOracle(RandomWalkEqOracle) :
     prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
     mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
     # get_properties_file(example) -> aalpy/Benchmarking/prism/eval/props/**example**.props
-    prism_ret = evaluate_all_properties(prism_model_path, get_properties_file(example), prism_adv_path)
+    prism_ret = evaluate_properties(prism_model_path, get_properties_file(example), prism_adv_path)
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
         # adv.traの出力がないので、SMCはできない → Equivalence test
         return super().find_cex(hypothesis)
 
-    # SMCを実行して、観測した動作をobservation tableと比較する
+    # SMCを実行して、モデルとSUTそれぞれの仕様の値を比較する
 
     # asyncio.run(execute_smc(prism_model_path, prism_adv_path))
-    cex = execute_smc(prism_model_path, prism_adv_path)
+    sample, cex, hypothesis_value = execute_smc(prism_model_path, prism_adv_path)
+
+    sut_value = prism_ret['prop1']
+
+    # self.sul.teacher # StochasticTeacherを呼び出すことができる
+
+    print(f'SUT value : {sut_value}\nHypothesis value : {hypothesis_value[0]}')
+
+    # hypothesis_value と sut_value を比較して違っていれば、cexを見つける
 
     print(f'CEX from SMC: {cex}')
     if cex != None:
-        return list(itertools.chain.from_iterable(map(list, cex)))
+        return cex
+
+    find_cex(sample, None)
 
     cex = super().find_cex(hypothesis) # equivalence testing
     print(f'CEX from EQ testing : {cex}')
 
     return cex
 
-
-def learn_benchmark_mdp(example, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=10, max_rounds=500,
+def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=10, max_rounds=500,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None,
                                  samples_cex_strategy=None):
-    # Specify the path to the dot file containing a MDP
     mdp = load_automaton_from_file(f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot', automaton_type='mdp')
     # visualize_automaton(mdp)
     input_alphabet = mdp.get_input_alphabet()
 
     sul = MdpSUL(mdp)
-    # eq_oracle = RandomWordEqOracle(input_alphabet, sul, num_walks=100, min_walk_len=5, max_walk_len=15,
-    #                                reset_after_cex=True)
-    # eq_oracle = RandomWalkEqOracle(input_alphabet, sul=sul, num_steps=2000, reset_prob=0.25,
-    #                                reset_after_cex=True)
-    eq_oracle = ProbBBCOracle(input_alphabet, sul=sul, num_steps=2000, reset_prob=0.25, reset_after_cex=True)
+
+    eq_oracle = ProbBBReachOracle(input_alphabet, sul=sul, num_steps=2000, reset_prob=0.25, reset_after_cex=True)
     # EQOracleChain
     learned_mdp = run_stochastic_Lstar(input_alphabet=input_alphabet, eq_oracle=eq_oracle, sul=sul, n_c=n_c,
                                        n_resample=n_resample, min_rounds=min_rounds, max_rounds=max_rounds,
@@ -185,31 +206,10 @@ def learn_benchmark_mdp(example, automaton_type='smm', n_c=20, n_resample=1000, 
                                        samples_cex_strategy=samples_cex_strategy, target_unambiguity=0.99,
                                        property_based_stopping=stopping_based_on_prop, custom_oracle=True)
 
-    return learned_mdp
+    learned_strategy = eq_oracle.learned_strategy
 
+    return learned_mdp, learned_strategy
 
+_, strategy = learn_mdp_and_strategy(example)
 
-learned_model = learn_benchmark_mdp(example)
-
-if isinstance(learned_model, StochasticMealyMachine):
-    mdp = smm_to_mdp_conversion(learned_model)
-else:
-    mdp = learned_model
-
-values, diff = model_check_experiment(get_properties_file(example), get_correct_prop_values(example), mdp)
-
-print('Value for each property:', [round(d * 100, 2) for d in values.values()])
-print('Error for each property:', [round(d * 100, 2) for d in diff.values()])
-
-
-    # proc = subprocess.Popen(
-    #     ['java', '-jar', multivesta_path, '-c', '-m', python_model_path, '-sm',  'true', '-f', quatex_spec, '-l', '2', '-sots', '1', '-sd', 'vesta.python.simpy.SimPyState', '-vp', 'true', '-bs', '300', '-ds', '[10]', '-a', '0.05', '-otherParams', 'python3'],
-    #     stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-    # )
-    # # TODO: 非同期にして、integratorと通信
-    # for line in io.TextIOWrapper(proc.stdout, encoding="utf-8"):
-    #     print(line) # for debug
-    #     if not line:
-    #         break
-    #     else:
-    #         match = multivesta_output_regrex.match(line)
+execute_smc(example, strategy)
