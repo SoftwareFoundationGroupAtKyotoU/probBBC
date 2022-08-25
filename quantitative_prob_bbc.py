@@ -1,5 +1,3 @@
-import asyncio
-import selectors
 import re
 import itertools
 import aalpy.paths
@@ -9,6 +7,8 @@ from aalpy.SULs import MdpSUL
 from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
 from aalpy.utils import visualize_automaton, load_automaton_from_file, smm_to_mdp_conversion, mdp_2_prism_format, model_check_properties, model_check_experiment, get_properties_file, get_correct_prop_values
+from Smc import StatisticalModelChecker
+from StrategyBridge import StrategyBridge
 
 aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
 aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
@@ -18,6 +18,7 @@ example = 'shared_coin'
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
+    print('PRISM call')
     import subprocess
     import io
     from os import path
@@ -45,110 +46,25 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
     proc.kill()
     return results
 
-def find_cex(sample, ot):
+def refine_ot_by_sample(sample, teacher):
     pass
 
 multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
-def execute_smc(prism_model_path, prism_adv_path):
-    import os
-    import socket
-    import pickle
-    import subprocess
-    # MV_python_integratorとの通信socket
-    if os.path.exists(socket_path):
-        os.remove(socket_path)
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    s.bind(socket_path)
-    s.listen()
+def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path):
 
-    multivesta_path = f'/Users/bo40/workspace/python/multivesta/multivesta.jar'
-    python_model_path = f'/Users/bo40/workspace/python/sandbox/MV_python_integrator.py'
-    quatex_spec = f'/Users/bo40/workspace/python/sandbox/spec.multiquatex'
+    sb = StrategyBridge(prism_adv_path, prism_model_path)
 
-    # -vp : display interactive plot window
-    multivesta_cmd = ["java", "-jar", multivesta_path, "-c", "-m", python_model_path, "-sm", "true", "-f", quatex_spec, "-l", "1", "-sots", "1", "-sd", "vesta.python.simpy.SimPyState", "-vp", "false", "-bs", "300", "-ds", "[10]", "-a", "0.05", "-otherParams", "python3"]
-    proc = subprocess.Popen(multivesta_cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return StatisticalModelChecker(sul, sb, spec_path, num_exec=2000)
 
-    connection, _ = s.accept()
-    connection.setblocking(False)
-
-    sel = selectors.DefaultSelector()
-
-    # MultiVeStAから呼び出されるモデルとの通信sokcetを読み出す
-    def read_mv_python_integrator(conn, mask, ret):
-        data = conn.recv(32768)
-        if len(data) > 0:
-            try:
-                params = pickle.loads(data)
-                # print(f'MV_py: {cex}')
-                if "print" in params:
-                    print(f'MV_integrator: {params["print"]}')
-                if "trace" in params:
-                    ret['sample'].append(params["trace"])
-                if "cex" in params:
-                    ret['cex'].append(params["cex"])
-            except pickle.UnpicklingError:
-                pass # TODO : dataを保存しておくか、バッファーを大きくする
-        return ret
-
-    # MultiVeStAの標準出力を読み込む
-    def read_multivesta(file, mask, ret):
-        output = file.read1().decode('utf-8').rstrip()
-        for line in output.splitlines():
-            match = multivesta_output_regex.search(line)
-            if match:
-                ret['result'].append((match.group(1), match.group(2), match.group(3)))
-        print(f'child: {output}')
-        # MultiVeStAが終了しているか確認
-        if proc.poll() != None:
-            sel.modify(file, selectors.EVENT_READ, None)
-        return ret
-
-    sel.register(connection, selectors.EVENT_READ, read_mv_python_integrator)
-    sel.register(proc.stdout, selectors.EVENT_READ, read_multivesta)
-
-    quit = False
-    multivesta_ret = {'sample': [], 'cex': [], 'result': []}
-    while True:
-        for key, mask in sel.select():
-            if key.data == None:
-                quit = True
-            else:
-                callback = key.data
-                multivesta_ret = callback(key.fileobj, mask, multivesta_ret)
-        if quit:
-            break
-
-    try:
-        # MultiVeStAが終了してから一度だけsocketを読む
-        data = connection.recv(16384)
-        if len(data) > 0:
-            print(f'MV_py: {pickle.loads(data)}')
-    except BlockingIOError:
-        pass
-
-    sel.unregister(connection.fileno())
-    sel.unregister(proc.stdout.fileno())
-    connection.close()
-    s.close()
-    sel.close()
-
-    if len(multivesta_ret['result']) == 0:
-        multivesta_ret['result'] = [(None,None,None)]
-
-    if len(multivesta_ret['cex']) > 0:
-        return multivesta_ret['sample'], multivesta_ret['cex'][-1], multivesta_ret['result'][0]
-
-    return multivesta_ret['sample'], None, multivesta_ret['result'][0]
-
+# PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
   def __init__(self, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09):
     self.previous_strategy = None
     self.current_strategy = None
+    self.observation_table = None
     super().__init__(alphabet, sul=sul, num_steps=num_steps, reset_after_cex=reset_after_cex, reset_prob=reset_prob)
 
   def find_cex(self, hypothesis):
-    print('PRISM call')
     if isinstance(hypothesis, StochasticMealyMachine):
         mdp = smm_to_mdp_conversion(hypothesis)
     else:
@@ -156,34 +72,34 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
     prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
+    prop_path = f'/Users/bo40/workspace/python/sandbox/shared_coin.props'
     mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
-    # get_properties_file(example) -> aalpy/Benchmarking/prism/eval/props/**example**.props
-    prism_ret = evaluate_properties(prism_model_path, get_properties_file(example), prism_adv_path)
+    prism_ret = evaluate_properties(prism_model_path, prop_path, prism_adv_path)
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
         # adv.traの出力がないので、SMCはできない → Equivalence test
         return super().find_cex(hypothesis)
 
-    # SMCを実行して、モデルとSUTそれぞれの仕様の値を比較する
-
-    # asyncio.run(execute_smc(prism_model_path, prism_adv_path))
-    sample, cex, hypothesis_value = execute_smc(prism_model_path, prism_adv_path)
-
     sut_value = prism_ret['prop1']
 
+    # SMCを実行する
+    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, get_properties_file(example), sut_value)
+    cex = smc.run()
+
+    # SMCの結果 と sut_value に有意差があるか検定を行う
+    print(f'SUT value : {sut_value}\nHypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
+    smc.hypothesis_testing(sut_value, 'two-sided')
+
     # self.sul.teacher # StochasticTeacherを呼び出すことができる
-
-    print(f'SUT value : {sut_value}\nHypothesis value : {hypothesis_value[0]}')
-
-    # hypothesis_value と sut_value を比較して違っていれば、cexを見つける
+    # SMC実行時の実行トレースを使ってObservation tableの更新
+    refine_ot_by_sample(smc.exec_sample, self.sul.teacher)
 
     print(f'CEX from SMC: {cex}')
     if cex != None:
         return cex
 
-    find_cex(sample, None)
-
+    # SMCで反例が見つからなかったので equivalence testing
     cex = super().find_cex(hypothesis) # equivalence testing
     print(f'CEX from EQ testing : {cex}')
 
