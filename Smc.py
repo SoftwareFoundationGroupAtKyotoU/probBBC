@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+from aalpy.learning_algs.stochastic.SamplingBasedObservationTable import SamplingBasedObservationTable
 
 from aalpy.base import SUL
 import spot
@@ -9,10 +10,11 @@ from StrategyBridge import StrategyBridge
 
 
 class StatisticalModelChecker:
-    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, num_exec=1000, max_exec_len=30):
+    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=50):
         self.sut = mdp_sut
         self.strategy_bridge = strategy_bridge
-
+        self.sut_value = sut_value
+        self.observation_table : SamplingBasedObservationTable = observation_table
         with open(spec_path) as f:
             spec = f.readline()
         self.spec_monitor = spot.translate(spec, 'monitor', 'det')
@@ -28,6 +30,7 @@ class StatisticalModelChecker:
             self.reset_sut()
             for i in range(0, self.max_exec_len):
                 ret = self.one_step()
+                # Hypothesisで遷移できないような入出力列が見つかれば、SMCを終了
                 # if not ret:
                 #     return self.exec_trace
                 monitor_ret = self.step_monitor(self.current_output)
@@ -38,6 +41,16 @@ class StatisticalModelChecker:
             if monitor_ret:
                 self.exec_count_satisfication += 1
             self.exec_sample.append(self.exec_trace)
+
+            if (k + 1) % 500 == 0:
+                # Observation tableの更新
+                self.observation_table.update_obs_table_with_freq_obs()
+                # Closedness, Consistencyの判定
+                row_to_close = self.observation_table.get_row_to_close()
+                consistency_violation = self.observation_table.get_consistency_violation()
+                # Observation tableがclosedかつconsistentでなくなったときはSMCを早期終了
+                if row_to_close or consistency_violation:
+                    return -1
 
             if (k + 1) % 1000 == 0:
                 print(f'SUT executed {k} times')
@@ -64,6 +77,8 @@ class StatisticalModelChecker:
         # 実行列を保存
         self.exec_trace.append(action)
         self.exec_trace.append(self.current_output)
+
+        # Hypothesis側で入出力に対応する遷移を行う
         ret = self.strategy_bridge.update_state(action, self.current_output)
         if not ret:
             # Hypothesisで遷移できない出力を観測した

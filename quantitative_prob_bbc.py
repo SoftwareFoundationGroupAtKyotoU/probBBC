@@ -1,20 +1,22 @@
 import re
-import itertools
+import collections
 import aalpy.paths
 from aalpy.base import Oracle, SUL
 from aalpy.automata import StochasticMealyMachine
 from aalpy.SULs import MdpSUL
 from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
-from aalpy.utils import visualize_automaton, load_automaton_from_file, smm_to_mdp_conversion, mdp_2_prism_format, model_check_properties, model_check_experiment, get_properties_file, get_correct_prop_values
+from aalpy.utils import load_automaton_from_file, mdp_2_prism_format, get_properties_file, get_correct_prop_values
+from aalpy.automata.StochasticMealyMachine import smm_to_mdp_conversion
+
 from Smc import StatisticalModelChecker
 from StrategyBridge import StrategyBridge
 
 aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
 aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
 
-socket_path = '/tmp/multivesta.sock'
 example = 'shared_coin'
+prop_name = 'shared_coin1'
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
@@ -49,12 +51,21 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
 def refine_ot_by_sample(sample, teacher):
     pass
 
-multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
-def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path):
+def sort_by_frequency(sample):
+    counter = collections.Counter(sample)
+    return counter.most_common()
+
+def compare_frequency(trace, smc_freq, mdp):
+    
+    return False
+
+# multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
+
+def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table):
 
     sb = StrategyBridge(prism_adv_path, prism_model_path)
 
-    return StatisticalModelChecker(sul, sb, spec_path, num_exec=2000)
+    return StatisticalModelChecker(sul, sb, spec_path, sut_value, observation_table, num_exec=2000)
 
 # PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
@@ -72,7 +83,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
     prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
-    prop_path = f'/Users/bo40/workspace/python/sandbox/shared_coin.props'
+    prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
     mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
     prism_ret = evaluate_properties(prism_model_path, prop_path, prism_adv_path)
 
@@ -84,21 +95,34 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     sut_value = prism_ret['prop1']
 
     # SMCを実行する
-    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, get_properties_file(example), sut_value)
+    ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
+    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, ltl_prop_path, sut_value, self.observation_table)
     cex = smc.run()
+
+    print(f'CEX from SMC: {cex}')
+
+    if cex != -1 and cex != None:
+        # 具体的な反例が得られればそれを返す
+        return cex
+
+    if cex == -1:
+        # Observation tableがclosedかつconsistentでなくなったとき
+        return None
 
     # SMCの結果 と sut_value に有意差があるか検定を行う
     print(f'SUT value : {sut_value}\nHypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
-    smc.hypothesis_testing(sut_value, 'two-sided')
+    hyp_test_ret = smc.hypothesis_testing(sut_value, 'two-sided')
+    print(f'Hypothesis testing result : {hyp_test_ret}')
 
-    # self.sul.teacher # StochasticTeacherを呼び出すことができる
-    # SMC実行時の実行トレースを使ってObservation tableの更新
-    refine_ot_by_sample(smc.exec_sample, self.sul.teacher)
+    # if hyp_test_ret violates the error bound
+    # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
+    cex_candidates = sort_by_frequency(smc.exec_sample)
+    for (exec_trace, freq) in cex_candidates:
+        if compare_frequency(exec_trace, freq, mdp):
+            # 違う分布であれば反例
+            return exec_trace
 
-    print(f'CEX from SMC: {cex}')
-    if cex != None:
-        return cex
-
+    # if hyp_test_ret satisfies the error bound
     # SMCで反例が見つからなかったので equivalence testing
     cex = super().find_cex(hypothesis) # equivalence testing
     print(f'CEX from EQ testing : {cex}')
