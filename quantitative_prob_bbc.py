@@ -1,5 +1,7 @@
 import re
 import collections
+from sys import prefix
+from typing import List
 import aalpy.paths
 from aalpy.base import Oracle, SUL
 from aalpy.automata import StochasticMealyMachine
@@ -16,7 +18,7 @@ aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
 aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
 
 example = 'shared_coin'
-prop_name = 'shared_coin1'
+prop_name = 'shared_coin2'
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
@@ -52,12 +54,60 @@ def refine_ot_by_sample(sample, teacher):
     pass
 
 def sort_by_frequency(sample):
-    counter = collections.Counter(sample)
+    # 以下デバッグ用
+    # for t in sample:
+    #     eq = True
+    #     for a, b in zip(t, sample[0]):
+    #         if a != b:
+    #             eq = False
+    #             break
+    #     if eq:
+    #         print(t)
+    prefix_closed_sample = []
+    for trace in sample:
+        for i in range(2, len(trace) + 1, 2):
+            prefix_closed_sample.append(tuple(trace[0:i]))
+    counter = collections.Counter(prefix_closed_sample)
     return counter.most_common()
 
-def compare_frequency(trace, smc_freq, mdp):
-    
-    return False
+def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
+    def probability_on_mdp(trace, mdp):
+        ret = 1.0
+        mdp_state = mdp.initial_state
+        for input, output in zip(trace[0::2], trace[1::2]):
+            for next_state, prob in mdp_state.transitions[input]:
+                if next_state.output == output:
+                    ret = ret * prob
+                    mdp_state = next_state
+                    break
+        return ret
+
+    cex_candidates = sort_by_frequency(satisfied_sample)
+    for (exec_trace, freq) in cex_candidates:
+        exec_trace = list(exec_trace)
+        # MDPでのtraceの出現確率を計算
+        mdp_prob = probability_on_mdp(exec_trace, mdp)
+
+        # total_sampleからtraceと同じ入力の実行列を抽出する
+        population_size = 0
+        for trace in total_sample:
+            equality_flag = True
+            for action1, action2 in zip(exec_trace[0::2], trace[0::2]):
+                if action1 != action2:
+                    equality_flag = False
+                    break
+            if equality_flag:
+                population_size += 1
+
+        sut_prob = freq / population_size
+
+        # 違う分布であれば反例として返す
+        # TODO: chernoff boundを使って評価する
+        if abs(mdp_prob - sut_prob) > diff_bound:
+            return exec_trace
+
+    # 反例が見つからなかった
+    return None
 
 # multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
 
@@ -69,10 +119,11 @@ def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, 
 
 # PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
-  def __init__(self, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09):
+  def __init__(self, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025):
     self.previous_strategy = None
     self.current_strategy = None
     self.observation_table = None
+    self.statistical_test_bound = statistical_test_bound
     super().__init__(alphabet, sul=sul, num_steps=num_steps, reset_after_cex=reset_after_cex, reset_prob=reset_prob)
 
   def find_cex(self, hypothesis):
@@ -115,12 +166,12 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     print(f'Hypothesis testing result : {hyp_test_ret}')
 
     # if hyp_test_ret violates the error bound
-    # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
-    cex_candidates = sort_by_frequency(smc.exec_sample)
-    for (exec_trace, freq) in cex_candidates:
-        if compare_frequency(exec_trace, freq, mdp):
-            # 違う分布であれば反例
-            return exec_trace
+    if hyp_test_ret.pvalue < self.statistical_test_bound:
+        # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
+        # TODO: 複数回のSMCのサンプルの和集合をtotal_sampleとして渡すこともできるようにする
+        cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
+        if cex != None:
+            return cex
 
     # if hyp_test_ret satisfies the error bound
     # SMCで反例が見つからなかったので equivalence testing

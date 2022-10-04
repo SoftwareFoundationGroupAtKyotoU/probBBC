@@ -22,6 +22,7 @@ class StatisticalModelChecker:
         self.num_exec = num_exec
         self.max_exec_len = max_exec_len
         self.exec_sample = []
+        self.satisfied_exec_sample = []
         self.exec_count_satisfication = 0
         self.exec_count_violation = 0
 
@@ -40,6 +41,7 @@ class StatisticalModelChecker:
             self.post_sut()
             if monitor_ret:
                 self.exec_count_satisfication += 1
+                self.satisfied_exec_sample.append(self.exec_trace)
             self.exec_sample.append(self.exec_trace)
 
             if (k + 1) % 500 == 0:
