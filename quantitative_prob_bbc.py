@@ -1,5 +1,6 @@
 import re
 import collections
+import os
 from sys import prefix
 from typing import List
 import aalpy.paths
@@ -17,8 +18,12 @@ from StrategyBridge import StrategyBridge
 aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
 aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
 
-example = 'shared_coin'
-prop_name = 'shared_coin2'
+# example = 'shared_coin'
+# prop_name = 'shared_coin2'
+# example = 'slot_machine'
+# prop_name = 'slot'
+example = 'mqtt'
+prop_name = 'mqtt'
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
@@ -111,11 +116,11 @@ def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
 
 # multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
 
-def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table):
+def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table, returnCEX):
 
     sb = StrategyBridge(prism_adv_path, prism_model_path)
 
-    return StatisticalModelChecker(sul, sb, spec_path, sut_value, observation_table, num_exec=2000)
+    return StatisticalModelChecker(sul, sb, spec_path, sut_value, observation_table, num_exec=5000, returnCEX=returnCEX)
 
 # PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
@@ -134,6 +139,10 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
     prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
+    if os.path.isfile(prism_model_path):
+        os.remove(prism_model_path)
+    if os.path.isfile(prism_adv_path):
+        os.remove(prism_adv_path)
     prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
     mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
     prism_ret = evaluate_properties(prism_model_path, prop_path, prism_adv_path)
@@ -143,11 +152,16 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
         # adv.traの出力がないので、SMCはできない → Equivalence test
         return super().find_cex(hypothesis)
 
+    if not os.path.isfile(prism_adv_path):
+        # strategyが生成できていない場合 (エラー)
+        return super().find_cex(hypothesis)
+
+    self.learned_strategy = prism_adv_path
     sut_value = prism_ret['prop1']
 
     # SMCを実行する
     ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
-    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, ltl_prop_path, sut_value, self.observation_table)
+    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, ltl_prop_path, sut_value, self.observation_table, True)
     cex = smc.run()
 
     print(f'CEX from SMC: {cex}')
@@ -180,7 +194,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     return cex
 
-def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=10, max_rounds=500,
+def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=500,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None,
                                  samples_cex_strategy=None):
     mdp = load_automaton_from_file(f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot', automaton_type='mdp')
@@ -199,8 +213,15 @@ def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=100
 
     learned_strategy = eq_oracle.learned_strategy
 
+    prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
+    prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
+    ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
+    smc : StatisticalModelChecker = initialize_smc(sul, prism_model_path, prism_adv_path, ltl_prop_path, 0, None, False)
+    smc.run()
+    print(f'Hypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
+
     return learned_mdp, learned_strategy
 
-_, strategy = learn_mdp_and_strategy(example)
+learned_mdp, strategy = learn_mdp_and_strategy(example)
 
-execute_smc(example, strategy)
+

@@ -10,7 +10,7 @@ from StrategyBridge import StrategyBridge
 
 
 class StatisticalModelChecker:
-    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=50):
+    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=50, returnCEX=False):
         self.sut = mdp_sut
         self.strategy_bridge = strategy_bridge
         self.sut_value = sut_value
@@ -21,6 +21,7 @@ class StatisticalModelChecker:
         self.bdict = self.spec_monitor.get_dict()
         self.num_exec = num_exec
         self.max_exec_len = max_exec_len
+        self.returnCEX = returnCEX
         self.exec_sample = []
         self.satisfied_exec_sample = []
         self.exec_count_satisfication = 0
@@ -32,8 +33,8 @@ class StatisticalModelChecker:
             for i in range(0, self.max_exec_len):
                 ret = self.one_step()
                 # Hypothesisで遷移できないような入出力列が見つかれば、SMCを終了
-                # if not ret:
-                #     return self.exec_trace
+                if not ret and self.returnCEX:
+                    return self.exec_trace
                 monitor_ret = self.step_monitor(self.current_output)
                 if not monitor_ret:
                     self.exec_count_violation += 1
@@ -44,7 +45,7 @@ class StatisticalModelChecker:
                 self.satisfied_exec_sample.append(self.exec_trace)
             self.exec_sample.append(self.exec_trace)
 
-            if (k + 1) % 500 == 0:
+            if (k + 1) % 500 == 0 and self.observation_table:
                 # Observation tableの更新
                 self.observation_table.update_obs_table_with_freq_obs()
                 # Closedness, Consistencyの判定

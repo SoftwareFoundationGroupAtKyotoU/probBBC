@@ -39,7 +39,7 @@ class StrategyBridge:
         # TODO: 分岐処理は、current_stateが全て0になる場合をupdate_stateやMultiVestaで適切に処理すれば不要
         action : Action = ""
         if sum(prob_dist) == 0.0:
-            action = random.choices(["go1", "go2"], [0.5,0.5], k=1)[0]
+            action = random.choices(actions, [1 / len(actions)] * len(actions), k=1)[0]
         else:
             action = random.choices(actions, prob_dist, k=1)[0]
 
