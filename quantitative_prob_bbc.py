@@ -14,6 +14,7 @@ from aalpy.automata.StochasticMealyMachine import smm_to_mdp_conversion
 
 from Smc import StatisticalModelChecker
 from StrategyBridge import StrategyBridge
+from PrismModelConverter import add_step_counter_to_prism_model
 
 aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
 aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
@@ -145,7 +146,9 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
         os.remove(prism_adv_path)
     prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
     mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
-    prism_ret = evaluate_properties(prism_model_path, prop_path, prism_adv_path)
+    converted_model_path = f'/Users/bo40/workspace/python/mc_exp_converted.prism'
+    add_step_counter_to_prism_model(prism_model_path, converted_model_path)
+    prism_ret = evaluate_properties(converted_model_path, prop_path, prism_adv_path)
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
