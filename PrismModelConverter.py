@@ -1,6 +1,6 @@
 import re
 
-step_bound = 40
+step_bound = 20
 
 module_regex = re.compile(r"module (\w+)")
 label_regex = re.compile(r"(\d+\.*\d* : \([\w\d'=]+\))")
@@ -11,10 +11,10 @@ def add_step_counter_to_prism_model(prism_model_path, output_file_path):
             for line in f:
                 module_match = module_regex.match(line)
                 if module_match:
-                    modified_line = module_regex.sub(r"module \1\nsteps : [0..40] init 0;", line)
+                    modified_line = module_regex.sub(r"module \1\nsteps : [0.." + str(step_bound) + r"] init 0;", line)
                     o.write(modified_line)
                 else:
-                    modified_line = label_regex.sub(r"\1&(steps'=min(40,steps + 1))", line)
+                    modified_line = label_regex.sub(r"\1&(steps'=min(" + str(step_bound) + r",steps + 1))", line)
                     o.write(modified_line)
 
 # prism_model_path = f'/Users/bo40/workspace/python/mc_exp-slot_machine.prism'

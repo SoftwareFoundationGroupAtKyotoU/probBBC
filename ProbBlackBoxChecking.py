@@ -16,15 +16,6 @@ from Smc import StatisticalModelChecker
 from StrategyBridge import StrategyBridge
 from PrismModelConverter import add_step_counter_to_prism_model
 
-aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
-aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
-
-# example = 'shared_coin'
-# prop_name = 'shared_coin2'
-# example = 'slot_machine'
-# prop_name = 'slot'
-example = 'mqtt'
-prop_name = 'mqtt'
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
@@ -37,13 +28,15 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
     path_to_prism_file = aalpy.paths.path_to_prism[:-len(prism_file)]
 
     exportadvmdp = '-exportadvmdp'
-    file_abs_path = path.abspath(prism_file_name)
     adversary_path = path.abspath(prism_adv_path)
+    exportmodel = '-exportmodel'
+    output_model_path = '.all'
+    file_abs_path = path.abspath(prism_file_name)
     properties_als_path = path.abspath(properties_file_name)
     results = {}
     # PRISMの呼び出し adversaryを出力するようにパラメタ指定
     proc = subprocess.Popen(
-        [aalpy.paths.path_to_prism, exportadvmdp, adversary_path, file_abs_path, properties_als_path],
+        [aalpy.paths.path_to_prism, exportadvmdp, adversary_path, exportmodel, output_model_path, file_abs_path, properties_als_path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=path_to_prism_file)
     for line in io.TextIOWrapper(proc.stdout, encoding="utf-8"):
         print(line) # デバッグ用出力
@@ -115,8 +108,6 @@ def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
     # 反例が見つからなかった
     return None
 
-# multivesta_output_regex = re.compile("(\d\.\d+) \[var: (\d\.\d+), ci/2: (\d\.\d+)\]")
-
 def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table, returnCEX):
 
     sb = StrategyBridge(prism_adv_path, prism_model_path)
@@ -125,7 +116,11 @@ def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, 
 
 # PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
-  def __init__(self, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025):
+  def __init__(self, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, alphabet: list, sul: SUL, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025):
+    self.prism_model_path = prism_model_path
+    self.prism_adv_path = prism_adv_path
+    self.prism_prop_path = prism_prop_path
+    self.ltl_prop_path = ltl_prop_path
     self.previous_strategy = None
     self.current_strategy = None
     self.observation_table = None
@@ -138,33 +133,32 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     else:
         mdp = hypothesis
 
-    prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
-    prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
-    if os.path.isfile(prism_model_path):
-        os.remove(prism_model_path)
-    if os.path.isfile(prism_adv_path):
-        os.remove(prism_adv_path)
-    prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
-    mdp_2_prism_format(mdp, name='mc_exp', output_path=prism_model_path)
-    converted_model_path = f'/Users/bo40/workspace/python/mc_exp_converted.prism'
-    add_step_counter_to_prism_model(prism_model_path, converted_model_path)
-    prism_ret = evaluate_properties(converted_model_path, prop_path, prism_adv_path)
+    if os.path.isfile(self.prism_model_path):
+        os.remove(self.prism_model_path)
+    if os.path.isfile(self.prism_adv_path):
+        os.remove(self.prism_adv_path)
+    converted_model_path = f'{self.prism_model_path}.convert'
+    if os.path.isfile(converted_model_path):
+        os.remove(converted_model_path)
+
+    mdp_2_prism_format(mdp, name='mc_exp', output_path=self.prism_model_path)
+    # add_step_counter_to_prism_model(self.prism_model_path, converted_model_path)
+    prism_ret = evaluate_properties(self.prism_model_path, self.prism_prop_path, self.prism_adv_path)
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
         # adv.traの出力がないので、SMCはできない → Equivalence test
         return super().find_cex(hypothesis)
 
-    if not os.path.isfile(prism_adv_path):
+    if not os.path.isfile(self.prism_adv_path):
         # strategyが生成できていない場合 (エラー)
         return super().find_cex(hypothesis)
 
-    self.learned_strategy = prism_adv_path
+    self.learned_strategy = self.prism_adv_path
     sut_value = prism_ret['prop1']
 
     # SMCを実行する
-    ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
-    smc : StatisticalModelChecker = initialize_smc(self.sul, prism_model_path, prism_adv_path, ltl_prop_path, sut_value, self.observation_table, True)
+    smc : StatisticalModelChecker = initialize_smc(self.sul, self.prism_model_path, self.prism_adv_path, self.ltl_prop_path, sut_value, self.observation_table, True)
     cex = smc.run()
 
     print(f'CEX from SMC: {cex}')
@@ -197,16 +191,16 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     return cex
 
-def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=500,
+def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=500,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None,
                                  samples_cex_strategy=None):
-    mdp = load_automaton_from_file(f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot', automaton_type='mdp')
+    mdp = load_automaton_from_file(mdp_model_path, automaton_type='mdp')
     # visualize_automaton(mdp)
     input_alphabet = mdp.get_input_alphabet()
 
     sul = MdpSUL(mdp)
 
-    eq_oracle = ProbBBReachOracle(input_alphabet, sul=sul, num_steps=2000, reset_prob=0.25, reset_after_cex=True)
+    eq_oracle = ProbBBReachOracle(prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, input_alphabet, sul=sul, num_steps=2000, reset_prob=0.25, reset_after_cex=True)
     # EQOracleChain
     learned_mdp = run_stochastic_Lstar(input_alphabet=input_alphabet, eq_oracle=eq_oracle, sul=sul, n_c=n_c,
                                        n_resample=n_resample, min_rounds=min_rounds, max_rounds=max_rounds,
@@ -216,15 +210,27 @@ def learn_mdp_and_strategy(example, automaton_type='smm', n_c=20, n_resample=100
 
     learned_strategy = eq_oracle.learned_strategy
 
-    prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
-    prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
-    ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
     smc : StatisticalModelChecker = initialize_smc(sul, prism_model_path, prism_adv_path, ltl_prop_path, 0, None, False)
     smc.run()
     print(f'Hypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
 
     return learned_mdp, learned_strategy
 
-learned_mdp, strategy = learn_mdp_and_strategy(example)
+# example = 'shared_coin'
+# prop_name = 'shared_coin2'
+# example = 'slot_machine'
+# prop_name = 'slot'
+# example = 'mqtt'
+# prop_name = 'mqtt'
+
+# mdp_model_path = f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot'
+# prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
+# prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
+# prism_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
+# ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
+
+# learned_mdp, strategy = learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path)
+
+# print("Finish prob bbc")
 
 

@@ -10,7 +10,7 @@ from StrategyBridge import StrategyBridge
 
 
 class StatisticalModelChecker:
-    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=50, returnCEX=False):
+    def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=40, returnCEX=False):
         self.sut = mdp_sut
         self.strategy_bridge = strategy_bridge
         self.sut_value = sut_value
