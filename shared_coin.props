@@ -1,1 +1,1 @@
-Pmax=?[F ("finished")]
+Pmax=?[F ("finished"&steps<14)]

@@ -1,1 +1,1 @@
-Pmax=? [ F ("Pr10") ]
+Pmax=? [ F ("Pr10"&steps<8) ]
