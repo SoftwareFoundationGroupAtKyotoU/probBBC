@@ -11,7 +11,7 @@ Observation = str # モデルの出力ラベルの集合
 # (Σin × Σout)* → Dist(Σin) という型のplayer側の戦略を作る
 class StrategyBridge:
 
-    def __init__(self, strategy_path, prism_model_path):
+    def __init__(self, strategy_path, states_path, trans_path, labels_path):
         self.initial_state = 0
         # 状態sにいる確率が current_state[s]
         self.current_state: Dict[State, float] = dict()
@@ -21,7 +21,7 @@ class StrategyBridge:
         self.next_state: Dict[Tuple[State, Action, Observation], Dict[State, float]] = dict() # adv.traから得られたもの
         self.history : List[Tuple[Action, Observation]] = []
 
-        self.__init_state_and_observation(prism_model_path)
+        self.__init_state_and_observation(labels_path)
         self.__init_strategy(strategy_path)
         states : Set[int] = set(self.strategy.keys())
         self.current_state = dict.fromkeys(states, 0.0)
@@ -91,7 +91,41 @@ class StrategyBridge:
         self.history = []
 
     # PRISMのモデル記述ファイルから初期状態を読み込む
-    def __init_state_and_observation(self, prism_model_path):
+    def __init_state_and_observation(self, labels_path):
+        init_regex = re.compile(r".*?(\d+)=\"init\".*")
+        label_name_regex = re.compile(r"(\d+)=\"(\w+)\"")
+        label_regex = re.compile(r"(\d+):(.*)")
+        label_index_regex = re.compile(r"(\d+)")
+        labels_name = dict()
+        with open(labels_path) as f:
+            for line in f:
+                init_match = init_regex.match(line)
+                if init_match:
+                    # 初期状態の読み込み
+                    self.initial_state = int(init_match[1])
+                    # ラベルのindexと名前の対応関係の読み込み
+                    labels = label_name_regex.findall(line)
+                    for label in labels:
+                        labels_name[label[0]] = label[1]
+                else:
+                    label_match = label_regex.match(line)
+                    if label_match:
+                        state = label_match[1]
+                        # labelを読み込んでobservationsに保存する
+                        label_indices = label_index_regex.findall(label_match[2])
+                        for label_idx in label_indices:
+                            if label_idx in labels_name:
+                                label_name = labels_name[label_idx]
+                            else:
+                                label_name = 'unknownobservation'
+                            if int(state) in self.observation_map:
+                                self.observation_map[int(state)] = self.observation_map[int(state)] + "__" + label_name
+                            else:
+                                self.observation_map[int(state)] = label_name
+        for k in self.observation_map.keys():
+            self.observation_map[k] = StrategyBridge.__sort_observation(self.observation_map[k])
+
+    def __init_state_and_observation2(self, prism_model_path):
         init_regex = re.compile(r"loc : \[\d+\.\.\d+\] init (\d+);.*")
         label_regex = re.compile(r"label \"(\w+)\" = ([\w=|]+);.*")
         loc_regex = re.compile(r"loc=(\w+)")

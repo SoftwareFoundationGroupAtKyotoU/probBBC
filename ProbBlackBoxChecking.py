@@ -18,8 +18,8 @@ from PrismModelConverter import add_step_counter_to_prism_model
 
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
-def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
-    print('PRISM call')
+def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, exportstates_path, exporttrans_path, exportlabels_path):
+    print('PRISM call', flush=True)
     import subprocess
     import io
     from os import path
@@ -29,14 +29,15 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path):
 
     exportadvmdp = '-exportadvmdp'
     adversary_path = path.abspath(prism_adv_path)
-    exportmodel = '-exportmodel'
-    output_model_path = '.all'
+    exportstates = '-exportstates'
+    exporttrans = '-exporttrans'
+    exportlabels = '-exportlabels'
     file_abs_path = path.abspath(prism_file_name)
     properties_als_path = path.abspath(properties_file_name)
     results = {}
     # PRISMの呼び出し adversaryを出力するようにパラメタ指定
     proc = subprocess.Popen(
-        [aalpy.paths.path_to_prism, exportadvmdp, adversary_path, exportmodel, output_model_path, file_abs_path, properties_als_path],
+        [aalpy.paths.path_to_prism, exportadvmdp, adversary_path, exportstates, exportstates_path, exporttrans, exporttrans_path, exportlabels, exportlabels_path, file_abs_path, properties_als_path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=path_to_prism_file)
     for line in io.TextIOWrapper(proc.stdout, encoding="utf-8"):
         print(line) # デバッグ用出力
@@ -108,7 +109,7 @@ def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
     # 反例が見つからなかった
     return None
 
-def initialize_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table, returnCEX):
+def initialize_strategy_bridge_and_smc(sul, prism_model_path, prism_adv_path, spec_path, sut_value, observation_table, returnCEX):
 
     sb = StrategyBridge(prism_adv_path, prism_model_path)
 
@@ -133,6 +134,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     else:
         mdp = hypothesis
 
+    # PRISMへの入出力ファイルを準備
     if os.path.isfile(self.prism_model_path):
         os.remove(self.prism_model_path)
     if os.path.isfile(self.prism_adv_path):
@@ -140,10 +142,22 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     converted_model_path = f'{self.prism_model_path}.convert'
     if os.path.isfile(converted_model_path):
         os.remove(converted_model_path)
+    self.exportstates_path = f'{self.prism_model_path}.sta'
+    if os.path.isfile(self.exportstates_path):
+        os.remove(self.exportstates_path)
+    self.exporttrans_path = f'{self.prism_model_path}.tra'
+    if os.path.isfile(self.exporttrans_path):
+        os.remove(self.exporttrans_path)
+    self.exportlabels_path = f'{self.prism_model_path}.lab'
+    if os.path.isfile(self.exportlabels_path):
+        os.remove(self.exportlabels_path)
 
     mdp_2_prism_format(mdp, name='mc_exp', output_path=self.prism_model_path)
-    # add_step_counter_to_prism_model(self.prism_model_path, converted_model_path)
-    prism_ret = evaluate_properties(self.prism_model_path, self.prism_prop_path, self.prism_adv_path)
+    # PRISMのモデルにカウンタ変数を埋め込む
+    add_step_counter_to_prism_model(self.prism_model_path, converted_model_path)
+
+    # PRISMでモデル検査を実行
+    prism_ret = evaluate_properties(converted_model_path, self.prism_prop_path, self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path)
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
@@ -158,10 +172,11 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     sut_value = prism_ret['prop1']
 
     # SMCを実行する
-    smc : StatisticalModelChecker = initialize_smc(self.sul, self.prism_model_path, self.prism_adv_path, self.ltl_prop_path, sut_value, self.observation_table, True)
+    sb = StrategyBridge(self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path)
+    smc : StatisticalModelChecker = StatisticalModelChecker(self.sul, sb, self.ltl_prop_path, sut_value, self.observation_table, num_exec=5000, returnCEX=True)
     cex = smc.run()
 
-    print(f'CEX from SMC: {cex}')
+    print(f'CEX from SMC: {cex}', flush=True)
 
     if cex != -1 and cex != None:
         # 具体的な反例が得られればそれを返す
@@ -210,7 +225,8 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
 
     learned_strategy = eq_oracle.learned_strategy
 
-    smc : StatisticalModelChecker = initialize_smc(sul, prism_model_path, prism_adv_path, ltl_prop_path, 0, None, False)
+    sb = StrategyBridge(prism_adv_path, eq_oracle.exportstates_path, eq_oracle.exporttrans_path, eq_oracle.exportlabels_path)
+    smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000, returnCEX=False)
     smc.run()
     print(f'Hypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
 

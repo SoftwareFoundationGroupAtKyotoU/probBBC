@@ -10,10 +10,10 @@ def main_debug():
 
     # example = 'shared_coin'
     # prop_name = 'shared_coin2'
-    example = 'slot_machine'
-    prop_name = 'slot'
-    # example = 'mqtt'
-    # prop_name = 'mqtt'
+    # example = 'slot_machine'
+    # prop_name = 'slot'
+    example = 'mqtt'
+    prop_name = 'mqtt'
     # example = sys.argv[1]
     # prop_name = sys.argv[2]
 
