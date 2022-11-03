@@ -206,7 +206,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     return cex
 
-def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=500,
+def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=240,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None,
                                  samples_cex_strategy=None):
     mdp = load_automaton_from_file(mdp_model_path, automaton_type='mdp')
