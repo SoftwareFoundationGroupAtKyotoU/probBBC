@@ -221,7 +221,7 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
                                        n_resample=n_resample, min_rounds=min_rounds, max_rounds=max_rounds,
                                        automaton_type=automaton_type, strategy=strategy, cex_processing=cex_processing,
                                        samples_cex_strategy=samples_cex_strategy, target_unambiguity=0.99,
-                                       property_based_stopping=stopping_based_on_prop, custom_oracle=True)
+                                       property_based_stopping=stopping_based_on_prop, custom_oracle=True, print_level=3)
 
     learned_strategy = eq_oracle.learned_strategy
 

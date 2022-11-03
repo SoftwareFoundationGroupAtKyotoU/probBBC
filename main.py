@@ -9,11 +9,15 @@ def main_debug():
     aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
 
     # example = 'shared_coin'
-    # prop_name = 'shared_coin2'
+    # prop_name = 'shared_coin'
     # example = 'slot_machine'
     # prop_name = 'slot'
-    example = 'mqtt'
-    prop_name = 'mqtt'
+    # example = 'mqtt'
+    # prop_name = 'mqtt'
+    # example = 'tcp'
+    # prop_name = 'tcp'
+    example = 'first_grid'
+    prop_name = 'first_grid'
     # example = sys.argv[1]
     # prop_name = sys.argv[2]
 
