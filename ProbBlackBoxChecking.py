@@ -19,7 +19,8 @@ from PrismModelConverter import add_step_counter_to_prism_model
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, exportstates_path, exporttrans_path, exportlabels_path, debug=False):
-    print('PRISM call', flush=True)
+    if debug:
+        print('=============== PRISM output ===============', flush=True)
     import subprocess
     import io
     from os import path
@@ -49,6 +50,8 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, e
             if match:
                 results[f'prop{len(results) + 1}'] = float(match.group(1))
     proc.kill()
+    if debug:
+        print("=============== end of PRISM output ===============")
     return results
 
 def refine_ot_by_sample(sample, teacher):
@@ -164,6 +167,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     add_step_counter_to_prism_model(self.prism_model_path, converted_model_path)
 
     # PRISMでモデル検査を実行
+    print("Model check by PRISM.")
     prism_ret = evaluate_properties(converted_model_path, self.prism_prop_path, self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path, debug=self.debug)
 
     if len(prism_ret) == 0:
@@ -253,7 +257,7 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
     sb = StrategyBridge(prism_adv_path, eq_oracle.exportstates_path, eq_oracle.exporttrans_path, eq_oracle.exportlabels_path)
     smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000, returnCEX=False)
     smc.run()
-    print(f'Hypothesis value : {smc.exec_count_satisfication / smc.num_exec}')
+    print(f'SUT value by final SMC: {smc.exec_count_satisfication / smc.num_exec}')
 
     return learned_mdp, learned_strategy
 
