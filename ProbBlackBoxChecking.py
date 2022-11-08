@@ -1,6 +1,7 @@
 import re
 import collections
 import os
+import shutil
 from sys import prefix
 from typing import List
 import aalpy.paths
@@ -11,6 +12,7 @@ from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
 from aalpy.utils import load_automaton_from_file, mdp_2_prism_format, get_properties_file, get_correct_prop_values
 from aalpy.automata.StochasticMealyMachine import smm_to_mdp_conversion
+from aalpy.utils.HelperFunctions import print_observation_table
 
 from Smc import StatisticalModelChecker
 from StrategyBridge import StrategyBridge
@@ -122,7 +124,8 @@ def initialize_strategy_bridge_and_smc(sul, prism_model_path, prism_adv_path, sp
 # PRISM + SMC による反例探索オラクル
 class ProbBBReachOracle(RandomWalkEqOracle) :
   def __init__(self, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, alphabet: list, sul: SUL,
-               smc_max_exec=5000, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025, debug=False):
+               smc_max_exec=5000, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025,
+               output_dir='results', save_files_for_each_round=False, debug=False):
     self.prism_model_path = prism_model_path
     self.prism_adv_path = prism_adv_path
     self.prism_prop_path = prism_prop_path
@@ -132,10 +135,15 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     self.observation_table = None
     self.smc_max_exec = smc_max_exec
     self.statistical_test_bound = statistical_test_bound
+    self.output_dir = output_dir
+    self.save_files_for_each_round = save_files_for_each_round
     self.debug = debug
+    self.rounds = 0
     super().__init__(alphabet, sul=sul, num_steps=num_steps, reset_after_cex=reset_after_cex, reset_prob=reset_prob)
 
   def find_cex(self, hypothesis):
+    self.rounds += 1
+
     if self.debug:
         print("Called find_cex of ProbBBReachOracle")
 
@@ -149,9 +157,9 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
         os.remove(self.prism_model_path)
     if os.path.isfile(self.prism_adv_path):
         os.remove(self.prism_adv_path)
-    converted_model_path = f'{self.prism_model_path}.convert'
-    if os.path.isfile(converted_model_path):
-        os.remove(converted_model_path)
+    self.converted_model_path = f'{self.prism_model_path}.convert'
+    if os.path.isfile(self.converted_model_path):
+        os.remove(self.converted_model_path)
     self.exportstates_path = f'{self.prism_model_path}.sta'
     if os.path.isfile(self.exportstates_path):
         os.remove(self.exportstates_path)
@@ -164,11 +172,15 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     mdp_2_prism_format(mdp, name='mc_exp', output_path=self.prism_model_path)
     # PRISMのモデルにカウンタ変数を埋め込む
-    add_step_counter_to_prism_model(self.prism_model_path, converted_model_path)
+    add_step_counter_to_prism_model(self.prism_model_path, self.converted_model_path)
 
     # PRISMでモデル検査を実行
     print("Model check by PRISM.")
-    prism_ret = evaluate_properties(converted_model_path, self.prism_prop_path, self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path, debug=self.debug)
+    prism_ret = evaluate_properties(self.converted_model_path, self.prism_prop_path, self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path, debug=self.debug)
+
+    # 各ラウンドのファイルを保存
+    if self.save_files_for_each_round:
+        self.save_prism_files()
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
@@ -229,10 +241,28 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
     return cex
 
+  def save_prism_files(self):
+    rounds_dir = f"{self.output_dir}/rounds/r{self.rounds}"
+    print(f"Save intermediate generated files to {rounds_dir}")
+    os.makedirs(rounds_dir, exist_ok=True)
+    if os.path.isfile(self.prism_model_path):
+        shutil.copy(self.prism_model_path, f"{rounds_dir}/{os.path.basename(self.prism_model_path)}")
+    if os.path.isfile(self.prism_adv_path):
+        shutil.copy(self.prism_adv_path, f"{rounds_dir}/{os.path.basename(self.prism_adv_path)}")
+    if os.path.isfile(self.converted_model_path):
+        shutil.copy(self.converted_model_path, f"{rounds_dir}/{os.path.basename(self.converted_model_path)}")
+    if os.path.isfile(self.exportstates_path):
+        shutil.copy(self.exportstates_path, f"{rounds_dir}/{os.path.basename(self.exportstates_path)}")
+    if os.path.isfile(self.exporttrans_path):
+        shutil.copy(self.exporttrans_path, f"{rounds_dir}/{os.path.basename(self.exporttrans_path)}")
+    if os.path.isfile(self.exportlabels_path):
+        shutil.copy(self.exportlabels_path, f"{rounds_dir}/{os.path.basename(self.exportlabels_path)}")
+    # if self.debug:
+    #     ot = self.observation_table
+
 def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=240,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None, target_unambiguity=0.99, eq_num_steps=2000,
-                                 smc_max_exec=5000, smc_statistical_test_bound=0.025,
-                                 samples_cex_strategy=None, debug=False):
+                                 smc_max_exec=5000, smc_statistical_test_bound=0.025, samples_cex_strategy=None, output_dir='results', save_files_for_each_round=False, debug=False):
     mdp = load_automaton_from_file(mdp_model_path, automaton_type='mdp')
     # visualize_automaton(mdp)
     input_alphabet = mdp.get_input_alphabet()
@@ -241,7 +271,8 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
 
     eq_oracle = ProbBBReachOracle(prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, input_alphabet, sul=sul,
                                   smc_max_exec=smc_max_exec, statistical_test_bound=smc_statistical_test_bound,
-                                  num_steps=eq_num_steps, reset_prob=0.25, reset_after_cex=True, debug=debug)
+                                  num_steps=eq_num_steps, reset_prob=0.25, reset_after_cex=True,
+                                  output_dir=output_dir, save_files_for_each_round=save_files_for_each_round, debug=debug)
     # EQOracleChain
     print_level=2
     if debug:
