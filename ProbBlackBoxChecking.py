@@ -181,6 +181,15 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     # 各ラウンドのファイルを保存
     if self.save_files_for_each_round:
         self.save_prism_files()
+        info = {
+            'learning_rounds': self.rounds,
+            'automaton_size': len(hypothesis.states),
+            'sul.num_queries': self.sul.num_queries,
+            'sul.num_steps' : self.sul.num_steps,
+            'eq_oracle.num_queries': self.num_queries,
+            'eq_oracle.num_steps': self.num_steps,
+        }
+        print(f'Round information : {info}')
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
@@ -206,6 +215,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     smc : StatisticalModelChecker = StatisticalModelChecker(self.sul, sb, self.ltl_prop_path, hypothesis_value, self.observation_table, num_exec=self.smc_max_exec, returnCEX=True)
     cex = smc.run()
 
+    print(f'SMC executed SUL {smc.number_of_steps} steps ({smc.exec_count_satisfication + smc.exec_count_violation} queries)')
     print(f'CEX from SMC: {cex}', flush=True)
 
     if cex != -1 and cex != None:
