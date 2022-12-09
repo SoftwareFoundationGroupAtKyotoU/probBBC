@@ -26,20 +26,26 @@ class StrategyBridge:
         states : Set[int] = set(self.strategy.keys())
         self.current_state = dict.fromkeys(states, 0.0)
         self.current_state[self.initial_state] = 1
+        self.states = set(self.strategy.keys())
+        self.actions = set(self.strategy.values())
+        self.empty_state : Dict[State, float] = dict.fromkeys(self.states, 0.0)
+        self.empty_dist : Dict[Action, float] = dict.fromkeys(self.actions, 0.0)
+        self.uniform_dist = [1 / len(self.actions)] * len(self.actions)
 
     def next_action(self) -> Action:
-        dist : Dict[Action, float] = dict.fromkeys(set(self.strategy.values()), 0.0)
+        dist : Dict[Action, float] = self.empty_dist.copy()
         for state, weight in self.current_state.items():
             # self.strategy[state] : strategyでstateに対応づけられているアクション
-            dist[self.strategy[state]] += weight
+            if weight > 0:
+                dist[self.strategy[state]] += weight
         # actionがsampleされる確率がdist[action]というサンプリング
-        actions = [a for a in dist.keys()]
-        prob_dist = [p for p in dist.values()]
+        actions = list(dist.keys())
+        prob_dist = list(dist.values())
 
         # TODO: 分岐処理は、current_stateが全て0になる場合をupdate_stateやMultiVestaで適切に処理すれば不要
         action : Action = ""
         if sum(prob_dist) == 0.0:
-            action = random.choices(actions, [1 / len(actions)] * len(actions), k=1)[0]
+            action = random.choices(actions, self.uniform_dist, k=1)[0]
         else:
             action = random.choices(actions, prob_dist, k=1)[0]
 
@@ -52,35 +58,35 @@ class StrategyBridge:
         # 2. それをaalpyにequivalence queryの反例として返す (これが反例になっているのは、今のobservationの発生確率が0 vs. 非ゼロなのでそう)
         # (ということはreplay用に入出力の列を覚えておかないといけない)
         self.history.append((action, observation))
-        states : Set[int] = set(self.strategy.keys())
-        new_state: Dict[State, float] = dict.fromkeys(states, 0.0)
+        new_state: Dict[State, float] = self.empty_state.copy()
         observation = StrategyBridge.__sort_observation(observation)
 
         for state, weight in self.current_state.items():
             # new_state += weight * self.next_state[state, action, observation]
-            if (state, action, observation) in self.next_state:
-                dist = self.next_state[(state, action, observation)]
-                for s, prob in dist.items():
-                    # これはadv.traのバグだが、状態がadv.traに書いていないのでどうしようもない
-                    if s in new_state:
-                        new_state[s] = new_state[s] + (weight * prob)
-            else:
-                # TODO: found counterexample?
-                # if weight > 0:
-                    # print("update_state(found_counter example?)" + str(state) + "," + action + "," + observation)
-                pass
+            if weight > 0:
+                if (state, action, observation) in self.next_state:
+                    dist = self.next_state[(state, action, observation)]
+                    for s, prob in dist.items():
+                        # これはadv.traのバグだが、状態がadv.traに書いていないのでどうしようもない
+                        if prob > 0 and s in new_state:
+                            new_state[s] = new_state[s] + (weight * prob)
+                else:
+                    # TODO: found counterexample?
+                    # if weight > 0:
+                        # print("update_state(found_counter example?)" + str(state) + "," + action + "," + observation)
+                    pass
         # new_stateの正規化
-        regularized_new_state : Dict[State, float] = dict()
+        # regularized_new_state : Dict[State, float] = dict()
         prob_sum = sum(new_state.values())
         if prob_sum == 0.0:
             # observationに対応する次の状態が存在しない
             self.current_state = new_state
             return False
 
-        for s, prob in new_state.items():
-            regularized_new_state[s] = prob / prob_sum
+        for s in new_state:
+            new_state[s] = new_state[s] / prob_sum
 
-        self.current_state = regularized_new_state
+        self.current_state = new_state
         return True
 
     # strategyをresetするためのmethod
