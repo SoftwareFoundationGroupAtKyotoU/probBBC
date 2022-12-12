@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import stats
+from typing import Tuple
 from aalpy.learning_algs.stochastic.SamplingBasedObservationTable import SamplingBasedObservationTable
 
 from aalpy.base import SUL
@@ -35,9 +36,11 @@ class StatisticalModelChecker:
                 # Hypothesisで遷移できないような入出力列が見つかれば、SMCを終了
                 if not ret and self.returnCEX:
                     return self.exec_trace
-                monitor_ret = self.step_monitor(self.current_output)
+                (monitor_ret, satisfied) = self.step_monitor(self.current_output)
                 if not monitor_ret:
                     self.exec_count_violation += 1
+                    break
+                if satisfied and not self.returnCEX:
                     break
             self.post_sut()
             if monitor_ret:
@@ -92,23 +95,26 @@ class StatisticalModelChecker:
         self.sut.post()
 
     # 出力outputにより、モニターの状態遷移を行う。
-    # 返り値はモニターの状態遷移が行われたか否か。モニターの状態遷移が行えないことは、仕様の違反を意味する。
-    def step_monitor(self, output : str) -> bool:
+    # 返り値はモニターの状態遷移が行われたか否かと条件が常に成立する状態に到達したか否か。モニターの状態遷移が行えないことは、仕様の違反を意味する。
+    def step_monitor(self, output : str) -> Tuple[bool, bool]:
         # モニターの遷移ラベルのガードと、システムの出力を比較する
         edges = self.spec_monitor.out(self.monitor_current_state)
         accept = False
+        satisfied_ret = False
         for e in edges:
-            next_state = self.guardCheck(output, e)
+            (next_state, satisfied) = self.guardCheck(output, e)
             if not next_state:
                 continue
             else:
                 accept = True
                 self.monitor_current_state = next_state
+                satisfied_ret = satisfied
                 break
-        return accept
+        return (accept, satisfied_ret)
 
     # 出力outputと、モニターのedgeを受け取り、edgeの条件をoutputが満たしているか判定する
-    # 条件を満たしていてedgeで遷移できるならば遷移先の状態を返し、遷移できないならばNoneを返す
+    # 返り値はペアで、一つ目は条件を満たしていてedgeで遷移できるならば遷移先の状態を返し、遷移できないならばNoneを返す
+    # 二つ目はセルフループしか存在しない状態に到達したか否か（以降は条件が常に成立するか否か）
     def guardCheck(self, output : str, edge):
         cond = edge.cond
         label = spot.bdd_format_formula(self.bdict, cond)
@@ -116,7 +122,7 @@ class StatisticalModelChecker:
         # print(f'label : {label}')
         if (label == '1'):
             # 条件が常に成立
-            return edge.dst
+            return (edge.dst, True)
         aps_bdd = buddy.bdd_support(cond)
         aps = spot.bdd_format_formula(self.bdict, aps_bdd).split(' & ')
         obsv_aps = output.split('__')
@@ -133,6 +139,6 @@ class StatisticalModelChecker:
         # print(f'cond  : {restricted_label}')
         ret = buddy.bdd_satcount(cond)
         if (ret > 0):
-            return edge.dst
+            return (edge.dst, False)
         else:
-            return None
+            return (None, False)
