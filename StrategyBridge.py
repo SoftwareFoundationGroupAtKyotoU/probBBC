@@ -1,5 +1,6 @@
 import re
 import random
+import numpy as np
 from typing import Dict, Tuple, Set, List
 
 # Stateは多分本当はint
@@ -29,24 +30,26 @@ class StrategyBridge:
         self.current_state[self.initial_state] = 1
         self.empty_state : Dict[State, float] = dict.fromkeys(self.states, 0.0)
         self.empty_dist : Dict[Action, float] = dict.fromkeys(self.actions, 0.0)
+        self.actions_list : List[Action] = list(self.empty_dist.keys())
         self.uniform_dist = [1 / len(self.actions)] * len(self.actions)
 
     def next_action(self) -> Action:
         dist : Dict[Action, float] = self.empty_dist.copy()
+        is_empty_dist = True
         for state, weight in self.current_state.items():
             # self.strategy[state] : strategyでstateに対応づけられているアクション
             if weight > 0:
+                is_empty_dist = False
                 dist[self.strategy[state]] += weight
         # actionがsampleされる確率がdist[action]というサンプリング
-        actions = list(dist.keys())
         prob_dist = list(dist.values())
 
         # TODO: 分岐処理は、current_stateが全て0になる場合をupdate_stateやMultiVestaで適切に処理すれば不要
         action : Action = ""
-        if sum(prob_dist) == 0.0:
-            action = random.choices(actions, self.uniform_dist, k=1)[0]
+        if is_empty_dist:
+            action = random.choice(self.actions_list)
         else:
-            action = random.choices(actions, prob_dist, k=1)[0]
+            action = random.choices(self.actions_list, prob_dist, k=1)[0]
 
         return action
 
