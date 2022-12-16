@@ -21,7 +21,11 @@ class StrategyBridgeTestCase(unittest.TestCase):
     self.assertEqual(sb.action_map[sb.strategy[16]], "go2")
     self.assertEqual(sb.action_map[sb.strategy[20]], "go2")
     self.assertEqual(sb.action_map[sb.strategy[25]], "go1")
-    self.assertEqual(sb.next_state[(0, 'go2', 'agree__c1_tails__c2_tails__six')], {42: 1.0})
+    self.assertEqual(sb.next_state[sb.action_map.index("go2")][0][42], 0.510811812678)
+    self.assertEqual(sb.next_state[sb.action_map.index("go2")][0][45], 0.489188187322)
+    self.assertEqual(sb.observation_filter["____start__init"][0], 1.0)
+    self.assertEqual(sb.observation_filter["agree__c1_tails__c2_tails__six"][42], 1.0)
+    self.assertEqual(sb.observation_filter["agree__c1_tails__c2_tails__six"][45], 0.0)
 
 
   def test_next(self):
