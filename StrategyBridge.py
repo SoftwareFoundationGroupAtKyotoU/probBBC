@@ -20,31 +20,27 @@ class StrategyBridge:
         self.observation_map: Dict[State, Observation] = dict() # .prismから得られたもの
         # 本当はこんなに複雑じゃなくて良いかも
         self.next_state: Dict[Tuple[State, Action, Observation], Dict[State, float]] = dict() # adv.traから得られたもの
-        self.history : List[Tuple[Action, Observation]] = []
+        # self.history : List[Tuple[Action, Observation]] = []
 
         self.__init_state_and_observation(labels_path)
         self.__init_strategy(strategy_path, trans_path)
         self.states = set(self.strategy.keys())
         self.actions = set(self.strategy.values())
-        self.current_state = dict.fromkeys(self.states, 0.0)
-        self.current_state[self.initial_state] = 1
-        self.empty_state : Dict[State, float] = dict.fromkeys(self.states, 0.0)
+        self.current_state = {self.initial_state: 1.0}
         self.empty_dist : Dict[Action, float] = dict.fromkeys(self.actions, 0.0)
         self.actions_list : List[Action] = list(self.empty_dist.keys())
-        self.uniform_dist = [1 / len(self.actions)] * len(self.actions)
 
     def next_action(self) -> Action:
         dist : Dict[Action, float] = self.empty_dist.copy()
         is_empty_dist = True
         for state, weight in self.current_state.items():
             # self.strategy[state] : strategyでstateに対応づけられているアクション
-            if weight > 0:
+            if weight > 0 and state in self.strategy:
                 is_empty_dist = False
                 dist[self.strategy[state]] += weight
         # actionがsampleされる確率がdist[action]というサンプリング
         prob_dist = list(dist.values())
 
-        # TODO: 分岐処理は、current_stateが全て0になる場合をupdate_stateやMultiVestaで適切に処理すれば不要
         action : Action = ""
         if is_empty_dist:
             action = random.choice(self.actions_list)
@@ -53,15 +49,15 @@ class StrategyBridge:
 
         return action
 
-    def update_state(self, action: Action, observation: Observation) -> bool:
+    def update_state(self, action: Action, observation_aps: List[str]) -> bool:
         # 肝: actionはStrategy.next_actionで得られたものだが、observationはblack-boxなMDPを動かして観測されたもの
         # TODO: black-boxなMDPを動かして、想定していない出力が得られた場合に以下の処理だと困る。→ そういう状況を発見し次第aalpyにfeedbackする?
         # 1. 同様の入出力をblack-boxなMDPに与える → この出力のdistributionを得る
         # 2. それをaalpyにequivalence queryの反例として返す (これが反例になっているのは、今のobservationの発生確率が0 vs. 非ゼロなのでそう)
         # (ということはreplay用に入出力の列を覚えておかないといけない)
-        self.history.append((action, observation))
-        new_state: Dict[State, float] = self.empty_state.copy()
-        observation = StrategyBridge.__sort_observation(observation)
+        # self.history.append((action, observation))
+        new_state: Dict[State, float] = dict()
+        observation = StrategyBridge.__sort_observation(observation_aps)
 
         for state, weight in self.current_state.items():
             # new_state += weight * self.next_state[state, action, observation]
@@ -69,16 +65,17 @@ class StrategyBridge:
                 if (state, action, observation) in self.next_state:
                     dist = self.next_state[(state, action, observation)]
                     for s, prob in dist.items():
-                        # これはadv.traのバグだが、状態がadv.traに書いていないのでどうしようもない
-                        if prob > 0 and s in new_state:
-                            new_state[s] = new_state[s] + (weight * prob)
+                        if prob > 0:
+                            if s in new_state:
+                                new_state[s] = new_state[s] + (weight * prob)
+                            else:
+                                new_state[s] = weight * prob
                 else:
                     # TODO: found counterexample?
                     # if weight > 0:
                         # print("update_state(found_counter example?)" + str(state) + "," + action + "," + observation)
                     pass
         # new_stateの正規化
-        # regularized_new_state : Dict[State, float] = dict()
         prob_sum = sum(new_state.values())
         if prob_sum == 0.0:
             # observationに対応する次の状態が存在しない
@@ -93,9 +90,8 @@ class StrategyBridge:
 
     # strategyをresetするためのmethod
     def reset(self):
-        self.current_state = dict.fromkeys(self.states, 0.0)
-        self.current_state[self.initial_state] = 1
-        self.history = []
+        self.current_state = {self.initial_state: 1.0}
+        # self.history = []
 
     # PRISMのモデル記述ファイルから初期状態を読み込む
     def __init_state_and_observation(self, labels_path):
@@ -174,7 +170,6 @@ class StrategyBridge:
                 dist[s] = prob / prob_sum
             self.next_state[k] = dist
 
-    # observation (APを'__'で連結した文字列) をAPの辞書順で整列させる
-    def __sort_observation(observation) -> Observation:
-        obs_list = sorted(observation.split('__'))
-        return "__".join(obs_list)
+    # observation_aps (APの集合) をAPの辞書順で整列させ、"__"で連結した文字列として返す
+    def __sort_observation(observation_aps : List[str]) -> Observation:
+        return "__".join(sorted(observation_aps))

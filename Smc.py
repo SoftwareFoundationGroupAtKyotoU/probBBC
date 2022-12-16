@@ -1,6 +1,6 @@
 import numpy as np
 from scipy import stats
-from typing import Tuple
+from typing import Tuple, List
 from aalpy.learning_algs.stochastic.SamplingBasedObservationTable import SamplingBasedObservationTable
 
 from aalpy.base import SUL
@@ -36,7 +36,7 @@ class StatisticalModelChecker:
                 # Hypothesisで遷移できないような入出力列が見つかれば、SMCを終了
                 if not ret and self.returnCEX:
                     return self.exec_trace
-                (monitor_ret, satisfied) = self.step_monitor(self.current_output)
+                (monitor_ret, satisfied) = self.step_monitor(self.current_output_aps)
                 if not monitor_ret:
                     self.exec_count_violation += 1
                     break
@@ -70,6 +70,7 @@ class StatisticalModelChecker:
     def reset_sut(self):
         self.number_of_steps = 0
         self.current_output = self.sut.pre()
+        self.current_output_aps = self.current_output.split('__')
         self.strategy_bridge.reset()
         self.exec_trace = []
         self.monitor_current_state = self.spec_monitor.get_init_state_number()
@@ -80,12 +81,13 @@ class StatisticalModelChecker:
         # strategyから次のアクションを決め、SULを実行する
         action = self.strategy_bridge.next_action()
         self.current_output = self.sut.step(action)
+        self.current_output_aps = self.current_output.split('__')
         # 実行列を保存
         self.exec_trace.append(action)
         self.exec_trace.append(self.current_output)
 
         # Hypothesis側で入出力に対応する遷移を行う
-        ret = self.strategy_bridge.update_state(action, self.current_output)
+        ret = self.strategy_bridge.update_state(action, self.current_output_aps)
         if not ret:
             # Hypothesisで遷移できない出力を観測した
             pass
@@ -96,13 +98,13 @@ class StatisticalModelChecker:
 
     # 出力outputにより、モニターの状態遷移を行う。
     # 返り値はモニターの状態遷移が行われたか否かと条件が常に成立する状態に到達したか否か。モニターの状態遷移が行えないことは、仕様の違反を意味する。
-    def step_monitor(self, output : str) -> Tuple[bool, bool]:
+    def step_monitor(self, output_aps : List[str]) -> Tuple[bool, bool]:
         # モニターの遷移ラベルのガードと、システムの出力を比較する
         edges = self.spec_monitor.out(self.monitor_current_state)
         accept = False
         satisfied_ret = False
         for e in edges:
-            (next_state, satisfied) = self.guardCheck(output, e)
+            (next_state, satisfied) = self.guardCheck(output_aps, e)
             if not next_state:
                 continue
             else:
@@ -115,7 +117,7 @@ class StatisticalModelChecker:
     # 出力outputと、モニターのedgeを受け取り、edgeの条件をoutputが満たしているか判定する
     # 返り値はペアで、一つ目は条件を満たしていてedgeで遷移できるならば遷移先の状態を返し、遷移できないならばNoneを返す
     # 二つ目はセルフループしか存在しない状態に到達したか否か（以降は条件が常に成立するか否か）
-    def guardCheck(self, output : str, edge):
+    def guardCheck(self, output_aps : List[str], edge):
         cond = edge.cond
         label = spot.bdd_format_formula(self.bdict, cond)
         # print(f'output: {output}')
@@ -125,9 +127,8 @@ class StatisticalModelChecker:
             return (edge.dst, True)
         aps_bdd = buddy.bdd_support(cond)
         aps = spot.bdd_format_formula(self.bdict, aps_bdd).split(' & ')
-        obsv_aps = output.split('__')
         for ap in aps:
-            if (ap in obsv_aps):
+            if (ap in output_aps):
                 f = spot.formula_ap(ap)
                 var = self.bdict.varnum(f)
                 cond = buddy.bdd_restrict(cond, buddy.bdd_ithvar(var))
