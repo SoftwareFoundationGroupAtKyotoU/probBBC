@@ -122,9 +122,9 @@ class StrategyBridge:
                             else:
                                 label_name = 'unknownobservation'
                             if int(state) in self.observation_map:
-                                self.observation_map[int(state)] = self.observation_map[int(state)] + "__" + label_name
+                                self.observation_map[int(state)].append(label_name)
                             else:
-                                self.observation_map[int(state)] = label_name
+                                self.observation_map[int(state)] = [label_name]
         for k in self.observation_map.keys():
             self.observation_map[k] = StrategyBridge.__sort_observation(self.observation_map[k])
 
