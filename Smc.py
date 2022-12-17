@@ -20,6 +20,13 @@ class StatisticalModelChecker:
             spec = f.readline()
         self.spec_monitor = spot.translate(spec, 'monitor', 'det')
         self.bdict = self.spec_monitor.get_dict()
+        self.spec_monitor_out = []
+        for s in range(0, self.spec_monitor.num_states()):
+            self.spec_monitor_out.append(self.spec_monitor.out(s))
+        self.ap_varnum = dict()
+        for ap in self.spec_monitor.ap():
+            var = self.bdict.varnum(ap)
+            self.ap_varnum[ap.to_str()] = (buddy.bdd_ithvar(var), buddy.bdd_nithvar(var))
         self.num_exec = num_exec
         self.max_exec_len = max_exec_len
         self.returnCEX = returnCEX
@@ -100,7 +107,7 @@ class StatisticalModelChecker:
     # 返り値はモニターの状態遷移が行われたか否かと条件が常に成立する状態に到達したか否か。モニターの状態遷移が行えないことは、仕様の違反を意味する。
     def step_monitor(self, output_aps : List[str]) -> Tuple[bool, bool]:
         # モニターの遷移ラベルのガードと、システムの出力を比較する
-        edges = self.spec_monitor.out(self.monitor_current_state)
+        edges = self.spec_monitor_out[self.monitor_current_state]
         accept = False
         satisfied_ret = False
         for e in edges:
@@ -119,23 +126,22 @@ class StatisticalModelChecker:
     # 二つ目はセルフループしか存在しない状態に到達したか否か（以降は条件が常に成立するか否か）
     def guardCheck(self, output_aps : List[str], edge):
         cond = edge.cond
-        label = spot.bdd_format_formula(self.bdict, cond)
-        # print(f'output: {output}')
-        # print(f'label : {label}')
-        if (label == '1'):
+        # label = spot.bdd_format_formula(self.bdict, cond)
+        # # print(f'output: {output}')
+        # # print(f'label : {label}')
+        neg_cond = buddy.bdd_not(cond)
+        if buddy.bdd_satcount(neg_cond) == 0 and edge.src == edge.dst:
             # 条件が常に成立
             return (edge.dst, True)
         aps_bdd = buddy.bdd_support(cond)
         aps = spot.bdd_format_formula(self.bdict, aps_bdd).split(' & ')
         for ap in aps:
             if (ap in output_aps):
-                f = spot.formula_ap(ap)
-                var = self.bdict.varnum(f)
-                cond = buddy.bdd_restrict(cond, buddy.bdd_ithvar(var))
+                bdd_var = self.ap_varnum[ap][0]
+                cond = buddy.bdd_restrict(cond, bdd_var)
             else:
-                f = spot.formula_ap(ap)
-                var = self.bdict.varnum(f)
-                cond = buddy.bdd_restrict(cond, buddy.bdd_nithvar(var))
+                bdd_var = self.ap_varnum[ap][1]
+                cond = buddy.bdd_restrict(cond, bdd_var)
         # restricted_label = spot.bdd_format_formula(self.bdict, cond)
         # print(f'cond  : {restricted_label}')
         ret = buddy.bdd_satcount(cond)
@@ -143,3 +149,4 @@ class StatisticalModelChecker:
             return (edge.dst, False)
         else:
             return (None, False)
+
