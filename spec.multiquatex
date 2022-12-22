@@ -1,2 +1,0 @@
-Finished() = if ( s.rval("finished") == 1 ) then 1 else # Finished() fi ;
-eval E[ Finished() ] ;
