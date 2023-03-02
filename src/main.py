@@ -4,10 +4,15 @@ import argparse
 import aalpy.paths
 from ProbBlackBoxChecking import learn_mdp_and_strategy
 
+# aalpy.paths.path_to_prism = "/home/lab8/shijubo/prism-4.7-linux64/bin/prism"
+# aalpy.paths.path_to_properties = "/home/lab8/shijubo/ProbBBC/AALpy/Benchmarking/prism_eval_props/"
+aalpy.paths.path_to_prism = "/home/bo40_git/prism-4.7-linux64/bin/prism"
+aalpy.paths.path_to_properties = "/home/bo40_git/AALpy/Benchmarking/prism_eval_props/"
+
 def initialize_argparse():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model-name", dest="model_name", help="name of input model", required=True)
-    parser.add_argument("--prop-name", dest="prop_name", help="name of property file", required=True)
+    parser.add_argument("--model-file", dest="model_file", help="path to input dot model", required=True)
+    parser.add_argument("--prop-file", dest="prop_file", help="path to property file", required=True)
     parser.add_argument("--output-dir", dest="output_dir", help="name of output directory (Default value = 'result')", default="results")
     parser.add_argument("--save-files-for-each-round", dest="save_files_for_each_round", action="store_true", help="save files(model, hypothesis, strategy) for each rounds")
     parser.add_argument("--min-rounds", dest="min_rounds", type=int, help="minimum number of learning rounds of L*mdp (Default value = 20)", default=20)
@@ -31,28 +36,16 @@ def main_debug():
     aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
     aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
 
-    mdp_name = args.model_name
-    prop_name = args.prop_name
-    # example = 'shared_coin'
-    # prop_name = 'shared_coin'
-    # example = 'slot_machine'
-    # prop_name = 'slot'
-    # example = 'mqtt'
-    # prop_name = 'mqtt'
-    # example = 'tcp'
-    # prop_name = 'tcp'
-    # example = 'first_grid'
-    # prop_name = 'first_grid'
-
     output_dir = os.path.dirname(__file__) + f"/{args.output_dir}"
     os.makedirs(output_dir, exist_ok=True)
-    prop_dir = os.path.dirname(__file__)
 
-    mdp_model_path = f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{mdp_name}.dot'
+    mdp_model_path = args.model_file
     prism_model_path = f'{output_dir}/mc_exp.prism'
     prism_adv_path = f'{output_dir}/adv.tra'
-    prism_prop_path = f'{prop_dir}/{prop_name}.props'
-    ltl_prop_path = f'{prop_dir}/{prop_name}.ltl'
+    prop_file = args.prop_file
+    prism_prop_path = prop_file
+    prop_file_name, _ = os.path.splitext(prop_file)
+    ltl_prop_path = f'{prop_file_name}.ltl'
 
     learned_mdp, strategy = learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path,
         output_dir=output_dir, save_files_for_each_round=args.save_files_for_each_round,
@@ -66,21 +59,17 @@ def main():
     parser = initialize_argparse()
     args = parser.parse_args()
 
-    aalpy.paths.path_to_prism = "/home/lab8/shijubo/prism-4.7-linux64/bin/prism"
-    aalpy.paths.path_to_properties = "/home/lab8/shijubo/ProbBBC/AALpy/Benchmarking/prism_eval_props/"
-
-    mdp_name = args.model_name
-    prop_name = args.prop_name
-
     output_dir = os.path.dirname(__file__) + f"/{args.output_dir}"
     os.makedirs(output_dir, exist_ok=True)
     prop_dir = os.path.dirname(__file__)
 
-    mdp_model_path = f'/home/lab8/shijubo/ProbBBC/AALpy/DotModels/MDPs/{mdp_name}.dot'
+    mdp_model_path = args.model_file
     prism_model_path = f'{output_dir}/mc_exp.prism'
     prism_adv_path = f'{output_dir}/adv.tra'
-    prism_prop_path = f'{prop_dir}/{prop_name}.props'
-    ltl_prop_path = f'{prop_dir}/{prop_name}.ltl'
+    prop_file = args.prop_file
+    prism_prop_path = prop_file
+    prop_file_name, _ = os.path.splitext(prop_file)
+    ltl_prop_path = f'{prop_file_name}.ltl'
 
     learned_mdp, strategy = learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path,
         output_dir=output_dir, save_files_for_each_round=args.save_files_for_each_round,

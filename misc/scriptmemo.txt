@@ -10,7 +10,19 @@ python3 eval_each_round.py --rounds-log-dir results/rounds --model-path ../AALpy
 
 
 import pstats
-stats = pstats.Stats("cprofile.txt")
+stats = pstats.Stats("cprofile17.dump")
 stats.strip_dirs()
 stats.sort_stats('cumulative')
 stats.print_stats(30)
+
+
+gcp1 : slot_v2-5, mqtt17, tcp5
+gcp2 : mqtt14, tcp8 容量いっぱい
+gcp3 : slot8, mqtt11, tcp11 80GB
+gcp4 : slot14, mqtt8, tcp14 80GB
+gcp5 : slot17, mqtt5, tcp17 80GB
+gcp6 : sc14
+gcp7 : sc20
+gcp8 : slot5, slot_v2-17, slot_v2-8
+gcp9 : slot11, slot_v2-11, slot_v2-14 70GBm
+gcp10: second13, first10
