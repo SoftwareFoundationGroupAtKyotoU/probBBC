@@ -1,0 +1,5 @@
+Pmax=? [ F ("Pr10"&steps<5) ]
+Pmax=? [ F ("Pr10"&steps<8) ]
+Pmax=? [ F ("Pr10"&steps<11) ]
+Pmax=? [ F ("Pr10"&steps<14) ]
+Pmax=? [ F ("Pr10"&steps<17) ]
