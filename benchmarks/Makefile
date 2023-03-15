@@ -1,5 +1,6 @@
 ePMC := ~/ePMC/epmc-standard.jar
 JANI := first_grid/first.jani second_grid/second.jani  slot_r5/slot_machine_r5.jani mqtt/emqtt_two_client.jani  shared_coin/coin2.jani   slot_r5_v2/slot_machine_reduce_v2.jani
+PRISM_RESULTS := first_grid/first.result second_grid/second.result slot_r5/slot_machine_r5_with_steps.result mqtt/emqtt_two_client.result shared_coin/coin2.result tcp/tcp_server_ubuntu.result 
 
 all: $(JANI)
 
@@ -12,7 +13,12 @@ $(dir $(ePMC)):
 $(ePMC): $(dir $(ePMC))
 	cd $(shell dirname $@) && ./build.sh
 
-clean:
-	$(RM) $(JANI)
+prism: $(PRISM_RESULTS)
 
-.PHONY: all clean
+%.result: %.prism 
+	prism $< $(wildcard $(dir $<)/*-all.props) | grep Result: > $@
+
+clean:
+	$(RM) $(JANI) $(PRISM_RESULTS)
+
+.PHONY: all clean prism
