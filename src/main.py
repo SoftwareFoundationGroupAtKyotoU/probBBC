@@ -1,5 +1,6 @@
 import os
 import sys
+from os.path import abspath
 import argparse
 import aalpy.paths
 from ProbBlackBoxChecking import learn_mdp_and_strategy
@@ -30,7 +31,7 @@ def main():
 
     aalpy.paths.path_to_prism = args.prism_path
 
-    output_dir = os.path.dirname(__file__) + f"/{args.output_dir}"
+    output_dir = abspath(args.output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
     mdp_model_path = args.model_file
