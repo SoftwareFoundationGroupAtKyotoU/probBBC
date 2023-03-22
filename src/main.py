@@ -4,16 +4,12 @@ import argparse
 import aalpy.paths
 from ProbBlackBoxChecking import learn_mdp_and_strategy
 
-# aalpy.paths.path_to_prism = "/home/lab8/shijubo/prism-4.7-linux64/bin/prism"
-# aalpy.paths.path_to_properties = "/home/lab8/shijubo/ProbBBC/AALpy/Benchmarking/prism_eval_props/"
-aalpy.paths.path_to_prism = "/home/bo40_git/prism-4.7-linux64/bin/prism"
-aalpy.paths.path_to_properties = "/home/bo40_git/AALpy/Benchmarking/prism_eval_props/"
-
 def initialize_argparse():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-file", dest="model_file", help="path to input dot model", required=True)
     parser.add_argument("--prop-file", dest="prop_file", help="path to property file", required=True)
-    parser.add_argument("--output-dir", dest="output_dir", help="name of output directory (Default value = 'result')", default="results")
+    parser.add_argument("--prism-path", dest="prism_path", help="path to PRISM", required=True)
+    parser.add_argument("--output-dir", dest="output_dir", help="name of output directory (Default value = 'results')", default="results")
     parser.add_argument("--save-files-for-each-round", dest="save_files_for_each_round", action="store_true", help="save files(model, hypothesis, strategy) for each rounds")
     parser.add_argument("--min-rounds", dest="min_rounds", type=int, help="minimum number of learning rounds of L*mdp (Default value = 20)", default=20)
     parser.add_argument("--max-rounds", dest="max_rounds", type=int, help="if learning_rounds >= max_rounds, L*mdp learning will stop (Default value = 240)", default=240)
@@ -28,40 +24,14 @@ def initialize_argparse():
 
     return parser
 
-
-def main_debug():
-    parser = initialize_argparse()
-    args = parser.parse_args()
-
-    aalpy.paths.path_to_prism = "/Users/bo40/workspace/PRISM/prism/prism/bin/prism"
-    aalpy.paths.path_to_properties = "/Users/bo40/workspace/python/AALpy/Benchmarking/prism_eval_props/"
-
-    output_dir = os.path.dirname(__file__) + f"/{args.output_dir}"
-    os.makedirs(output_dir, exist_ok=True)
-
-    mdp_model_path = args.model_file
-    prism_model_path = f'{output_dir}/mc_exp.prism'
-    prism_adv_path = f'{output_dir}/adv.tra'
-    prop_file = args.prop_file
-    prism_prop_path = prop_file
-    prop_file_name, _ = os.path.splitext(prop_file)
-    ltl_prop_path = f'{prop_file_name}.ltl'
-
-    learned_mdp, strategy = learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path,
-        output_dir=output_dir, save_files_for_each_round=args.save_files_for_each_round,
-        min_rounds=args.min_rounds, max_rounds=args.max_rounds, strategy=args.l_star_mdp_strategy, n_c=args.n_c, n_resample=args.n_resample,
-        target_unambiguity=args.target_unambiguity, eq_num_steps=args.eq_num_steps, smc_max_exec=args.smc_max_exec,
-        smc_statistical_test_bound=args.smc_statistical_test_bound, debug=args.debug)
-
-    print("Finish prob bbc")
-
 def main():
     parser = initialize_argparse()
     args = parser.parse_args()
 
+    aalpy.paths.path_to_prism = args.prism_path
+
     output_dir = os.path.dirname(__file__) + f"/{args.output_dir}"
     os.makedirs(output_dir, exist_ok=True)
-    prop_dir = os.path.dirname(__file__)
 
     mdp_model_path = args.model_file
     prism_model_path = f'{output_dir}/mc_exp.prism'
@@ -80,5 +50,5 @@ def main():
     print("Finish prob bbc")
 
 if __name__ == "__main__":
-    main_debug()
+    main()
 

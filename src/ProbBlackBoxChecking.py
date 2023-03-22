@@ -60,15 +60,6 @@ def refine_ot_by_sample(sample, teacher):
     pass
 
 def sort_by_frequency(sample):
-    # 以下デバッグ用
-    # for t in sample:
-    #     eq = True
-    #     for a, b in zip(t, sample[0]):
-    #         if a != b:
-    #             eq = False
-    #             break
-    #     if eq:
-    #         print(t)
     prefix_closed_sample = []
     for trace in sample:
         for i in range(2, len(trace) + 1, 2):
@@ -302,21 +293,5 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
 
     return learned_mdp, learned_strategy
 
-# example = 'shared_coin'
-# prop_name = 'shared_coin2'
-# example = 'slot_machine'
-# prop_name = 'slot'
-# example = 'mqtt'
-# prop_name = 'mqtt'
-
-# mdp_model_path = f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot'
-# prism_model_path = f'/Users/bo40/workspace/python/mc_exp.prism'
-# prism_adv_path = f'/Users/bo40/workspace/python/adv.tra'
-# prism_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.props'
-# ltl_prop_path = f'/Users/bo40/workspace/python/sandbox/{prop_name}.ltl'
-
-# learned_mdp, strategy = learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path)
-
-# print("Finish prob bbc")
 
 
