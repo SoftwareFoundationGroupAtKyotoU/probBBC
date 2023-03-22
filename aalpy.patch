@@ -1,0 +1,14 @@
+diff --git a/aalpy/learning_algs/stochastic/StochasticLStar.py b/aalpy/learning_algs/stochastic/StochasticLStar.py
+index 3af0536..3fc0ced 100644
+--- a/aalpy/learning_algs/stochastic/StochasticLStar.py
++++ b/aalpy/learning_algs/stochastic/StochasticLStar.py
+@@ -112,6 +112,9 @@ def run_stochastic_Lstar(input_alphabet, sul: SUL, eq_oracle: Oracle, target_una
+                                                       stochastic_teacher, compatibility_checker=compatibility_checker,
+                                                       strategy=strategy,
+                                                       cex_processing=cex_processing)
++    # ===== BEGIN OF MODIFICATION =====
++    eq_oracle.observation_table = observation_table
++    # ===== END OF MODIFICATION =====
+ 
+     start_time = time.time()
+     eq_query_time = 0
