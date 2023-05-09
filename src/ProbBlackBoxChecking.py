@@ -116,6 +116,7 @@ def initialize_strategy_bridge_and_smc(sul, prism_model_path, prism_adv_path, sp
 class ProbBBReachOracle(RandomWalkEqOracle) :
   def __init__(self, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, alphabet: list, sul: SUL,
                smc_max_exec=5000, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025,
+               only_classical_equivalence_testing=False,
                output_dir='results', save_files_for_each_round=False, debug=False):
     self.prism_model_path = prism_model_path
     self.prism_adv_path = prism_adv_path
@@ -126,6 +127,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     self.observation_table = None
     self.smc_max_exec = smc_max_exec
     self.statistical_test_bound = statistical_test_bound
+    self.only_classical_equivalence_testing = only_classical_equivalence_testing
     self.output_dir = output_dir
     self.save_files_for_each_round = save_files_for_each_round
     self.debug = debug
@@ -207,32 +209,34 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     cex = smc.run()
 
     print(f'SMC executed SUL {smc.number_of_steps} steps ({smc.exec_count_satisfication + smc.exec_count_violation} queries)')
-    print(f'CEX from SMC: {cex}', flush=True)
+    if not self.only_classical_equivalence_testing:
+        print(f'CEX from SMC: {cex}', flush=True)
 
-    if cex != -1 and cex != None:
-        # 具体的な反例が得られればそれを返す
-        return cex
+        if cex != -1 and cex != None:
+            # 具体的な反例が得られればそれを返す
+            return cex
 
-    if cex == -1:
-        # Observation tableがclosedかつconsistentでなくなったとき
-        print("Exit find_cex of ProbBBReachOracle because observation table is not closed and consistent.")
-        return None
+        if cex == -1:
+            # Observation tableがclosedかつconsistentでなくなったとき
+            print("Exit find_cex of ProbBBReachOracle because observation table is not closed and consistent.")
+            return None
 
     # SMCの結果 と hypothesis_value に有意差があるか検定を行う
     print(f'SUT value : {smc.exec_count_satisfication / smc.num_exec}\nHypothesis value : {hypothesis_value}')
-    hyp_test_ret = smc.hypothesis_testing(hypothesis_value, 'two-sided')
-    print(f'Hypothesis testing result : {hyp_test_ret}')
+    if not self.only_classical_equivalence_testing:
+        hyp_test_ret = smc.hypothesis_testing(hypothesis_value, 'two-sided')
+        print(f'Hypothesis testing result : {hyp_test_ret}')
 
-    # if hyp_test_ret violates the error bound
-    if hyp_test_ret.pvalue < self.statistical_test_bound:
-        # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
-        # TODO: 複数回のSMCのサンプルの和集合をtotal_sampleとして渡すこともできるようにする
-        print("Compare frequency between SMC sample and hypothesis.")
-        cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
-        if cex != None:
-            print(f"CEX from compare_frequency : {cex}")
-            return cex
-        print("Could not find counterexample by compare_frequency.")
+        # if hyp_test_ret violates the error bound
+        if hyp_test_ret.pvalue < self.statistical_test_bound:
+            # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
+            # TODO: 複数回のSMCのサンプルの和集合をtotal_sampleとして渡すこともできるようにする
+            print("Compare frequency between SMC sample and hypothesis.")
+            cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
+            if cex != None:
+                print(f"CEX from compare_frequency : {cex}")
+                return cex
+            print("Could not find counterexample by compare_frequency.")
 
     # if hyp_test_ret satisfies the error bound
     # SMCで反例が見つからなかったので equivalence testing
@@ -263,7 +267,9 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
 def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20, max_rounds=240,
                                  strategy='normal', cex_processing='longest_prefix', stopping_based_on_prop=None, target_unambiguity=0.99, eq_num_steps=2000,
-                                 smc_max_exec=5000, smc_statistical_test_bound=0.025, samples_cex_strategy=None, output_dir='results', save_files_for_each_round=False, debug=False):
+                                 smc_max_exec=5000, smc_statistical_test_bound=0.025,
+                                 only_classical_equivalence_testing=False,
+                                 samples_cex_strategy=None, output_dir='results', save_files_for_each_round=False, debug=False):
     mdp = load_automaton_from_file(mdp_model_path, automaton_type='mdp')
     # visualize_automaton(mdp)
     input_alphabet = mdp.get_input_alphabet()
@@ -272,6 +278,7 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
 
     eq_oracle = ProbBBReachOracle(prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, input_alphabet, sul=sul,
                                   smc_max_exec=smc_max_exec, statistical_test_bound=smc_statistical_test_bound,
+                                  only_classical_equivalence_testing=only_classical_equivalence_testing,
                                   num_steps=eq_num_steps, reset_prob=0.25, reset_after_cex=True,
                                   output_dir=output_dir, save_files_for_each_round=save_files_for_each_round, debug=debug)
     # EQOracleChain
@@ -289,7 +296,7 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
     sb = StrategyBridge(prism_adv_path, eq_oracle.exportstates_path, eq_oracle.exporttrans_path, eq_oracle.exportlabels_path)
     smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000, returnCEX=False)
     smc.run()
-    print(f'SUT value by final SMC: {smc.exec_count_satisfication / smc.num_exec}')
+    print(f'SUT value by final SMC with {smc.num_exec} executions: {smc.exec_count_satisfication / smc.num_exec}')
 
     return learned_mdp, learned_strategy
 

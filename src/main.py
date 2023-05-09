@@ -20,6 +20,8 @@ def initialize_argparse():
     parser.add_argument("--target-unambiguity", dest="target_unambiguity", type=float, help="target unambiguity value of L*mdp (default 0.99)", default=0.99)
     parser.add_argument("--eq-num-steps", dest="eq_num_steps", type=int, help="number of steps to be preformed by equivalence oracle", default=2000)
     parser.add_argument("--smc-max-exec", dest="smc_max_exec", type=int, help="max number of executions by SMC (default=5000)", default=5000)
+    parser.add_argument("--only-classical-equivalence-testing", dest="only_classical_equivalence_testing",
+                        help="Skip the strategy guided equivalence testing using SMC", action='store_true')
     parser.add_argument("--smc-statistical-test-bound", dest="smc_statistical_test_bound", type=float, help="statistical test bound of difference check between SMC and model-checking (default 0.025)", default=0.025)
     parser.add_argument("-v", "--verbose", "--debug", dest="debug", action="store_true", help="output debug messages")
 
@@ -46,6 +48,7 @@ def main():
         output_dir=output_dir, save_files_for_each_round=args.save_files_for_each_round,
         min_rounds=args.min_rounds, max_rounds=args.max_rounds, strategy=args.l_star_mdp_strategy, n_c=args.n_c, n_resample=args.n_resample,
         target_unambiguity=args.target_unambiguity, eq_num_steps=args.eq_num_steps, smc_max_exec=args.smc_max_exec,
+        only_classical_equivalence_testing=args.only_classical_equivalence_testing,
         smc_statistical_test_bound=args.smc_statistical_test_bound, debug=args.debug)
 
     print("Finish prob bbc")
