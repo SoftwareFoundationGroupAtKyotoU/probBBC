@@ -21,7 +21,11 @@ from PrismModelConverter import add_step_counter_to_prism_model
 
 
 prism_prob_output_regex = re.compile("Result: (\d+\.\d+)")
+prism_error_regex = re.compile("Error:")
+prism_exception_regex = re.compile("^Exception in thread")
+
 def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, exportstates_path, exporttrans_path, exportlabels_path, debug=False):
+    logger = logging.getLogger('evaluate_properties')
     if debug:
         print('=============== PRISM output ===============', flush=True)
     import subprocess
@@ -43,12 +47,17 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, e
     proc = subprocess.Popen(
         [aalpy.paths.path_to_prism, exportadvmdp, adversary_path, exportstates, exportstates_path, exporttrans, exporttrans_path, exportlabels, exportlabels_path, file_abs_path, properties_als_path],
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=path_to_prism_file)
+    found_exception = False
     for line in io.TextIOWrapper(proc.stdout, encoding="utf-8"):
         if debug:
             print(line) # デバッグ用出力
         if not line:
             break
         else:
+            if prism_exception_regex.match(line):
+                found_exception = True
+            if found_exception or prism_error_regex.match(line):
+                logger.error(line)
             match = prism_prob_output_regex.match(line)
             if match:
                 results[f'prop{len(results) + 1}'] = float(match.group(1))
@@ -56,6 +65,7 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, e
     if debug:
         print("=============== end of PRISM output ===============")
     return results
+
 
 def refine_ot_by_sample(sample, teacher):
     pass
@@ -80,6 +90,7 @@ def sort_by_frequency_counter_in(sample) -> collections.Counter:
 
 def sort_by_frequency(sample):
     return sort_by_frequency_counter(sample).most_common()
+
 
 def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
     def probability_on_mdp(trace, mdp):
@@ -171,8 +182,9 @@ def initialize_strategy_bridge_and_smc(sul, prism_model_path, prism_adv_path, sp
 
     return StatisticalModelChecker(sul, sb, spec_path, hypothesis_value, observation_table, num_exec=5000, returnCEX=returnCEX)
 
+
 # PRISM + SMC による反例探索オラクル
-class ProbBBReachOracle(RandomWalkEqOracle) :
+class ProbBBReachOracle(RandomWalkEqOracle):
   def __init__(self, prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, alphabet: list, sul: SUL,
                smc_max_exec=5000, num_steps=5000, reset_after_cex=True, reset_prob=0.09, statistical_test_bound=0.025,
                only_classical_equivalence_testing=False,
@@ -196,8 +208,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
   def find_cex(self, hypothesis):
     self.rounds += 1
 
-    if self.debug:
-        print("Called find_cex of ProbBBReachOracle")
+    logging.debug("Called find_cex of ProbBBReachOracle")
 
     if isinstance(hypothesis, StochasticMealyMachine):
         mdp = smm_to_mdp_conversion(hypothesis)
@@ -227,7 +238,7 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
     add_step_counter_to_prism_model(self.prism_model_path, self.converted_model_path)
 
     # PRISMでモデル検査を実行
-    print("Model check by PRISM.")
+    logging.info("Model check by PRISM.")
     prism_ret = evaluate_properties(self.converted_model_path, self.prism_prop_path, self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path, debug=self.debug)
 
     # 各ラウンドのファイルを保存
@@ -241,35 +252,37 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
             'eq_oracle.num_queries': self.num_queries,
             'eq_oracle.num_steps': self.num_steps,
         }
-        print(f'Round information : {info}')
+        logging.info(f'Round information : {info}')
 
     if len(prism_ret) == 0:
         # 仕様を計算できていない (APが存在しない場合など)
         # adv.traの出力がないので、SMCはできない → Equivalence test
-        print("Model checker did not calculate probability.\nRun equivalence testing of L*mdp.")
+        logging.info("Model checker did not calculate probability.")
+        logging.info("Run equivalence testing of L*mdp.")
         cex = super().find_cex(hypothesis)
-        print(f"CEX from EQ testing : {cex}", flush=True)
+        logging.info(f"CEX from EQ testing : {cex}")
         return cex
 
     if not os.path.isfile(self.prism_adv_path):
         # strategyが生成できていない場合 (エラー)
-        print("Model checker did not output adversary file.\nRun equivalence testing of L*mdp.")
+        logging.info("Model checker did not output adversary file.")
+        logging.info("Run equivalence testing of L*mdp.")
         cex = super().find_cex(hypothesis)
-        print(f"CEX from EQ testing : {cex}", flush=True)
+        logging.info(f"CEX from EQ testing : {cex}")
         return cex
 
     self.learned_strategy = self.prism_adv_path
     hypothesis_value = prism_ret['prop1']
-    print(f"Hypothesis probability : {hypothesis_value}")
+    logging.info(f"Hypothesis probability : {hypothesis_value}")
 
     # SMCを実行する
     sb = StrategyBridge(self.prism_adv_path, self.exportstates_path, self.exporttrans_path, self.exportlabels_path)
     smc : StatisticalModelChecker = StatisticalModelChecker(self.sul, sb, self.ltl_prop_path, hypothesis_value, self.observation_table, num_exec=self.smc_max_exec, returnCEX=True)
     cex = smc.run()
 
-    print(f'SMC executed SUL {smc.number_of_steps} steps ({smc.exec_count_satisfication + smc.exec_count_violation} queries)')
+    logging.info(f'SMC executed SUL {smc.number_of_steps} steps ({smc.exec_count_satisfication + smc.exec_count_violation} queries)')
     if not self.only_classical_equivalence_testing:
-        print(f'CEX from SMC: {cex}', flush=True)
+        logging.info(f'CEX from SMC: {cex}')
 
         if cex != -1 and cex != None:
             # 具体的な反例が得られればそれを返す
@@ -277,14 +290,15 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
 
         if cex == -1:
             # Observation tableがclosedかつconsistentでなくなったとき
-            print("Exit find_cex of ProbBBReachOracle because observation table is not closed and consistent.")
+            logging.info("Exit find_cex of ProbBBReachOracle because observation table is not closed and consistent.")
             return None
 
     # SMCの結果 と hypothesis_value に有意差があるか検定を行う
-    print(f'SUT value : {smc.exec_count_satisfication / smc.num_exec}\nHypothesis value : {hypothesis_value}')
+    logging.info(f'SUT value : {smc.exec_count_satisfication / smc.num_exec}')
+    logging.info(f'Hypothesis value : {hypothesis_value}')
     if not self.only_classical_equivalence_testing:
         hyp_test_ret = smc.hypothesis_testing(hypothesis_value, 'two-sided')
-        print(f'Hypothesis testing result : {hyp_test_ret}')
+        logging.info(f'Hypothesis testing result : {hyp_test_ret}')
 
         # if hyp_test_ret violates the error bound
         if hyp_test_ret.pvalue < self.statistical_test_bound:
@@ -294,21 +308,21 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
             # cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
             cex = compare_frequency_with_tail(smc.exec_sample, mdp, self.statistical_test_bound)
             if cex != None:
-                print(f"CEX from compare_frequency : {cex}")
+                logging.info(f"CEX from compare_frequency : {cex}")
                 return cex
-            print("Could not find counterexample by compare_frequency.")
+            logging.info("Could not find counterexample by compare_frequency.")
 
     # if hyp_test_ret satisfies the error bound
     # SMCで反例が見つからなかったので equivalence testing
-    print("Run equivalence testing of L*mdp.")
+    logging.info("Run equivalence testing of L*mdp.")
     cex = super().find_cex(hypothesis) # equivalence testing
-    print(f'CEX from EQ testing : {cex}')
+    logging.info(f'CEX from EQ testing : {cex}')
 
     return cex
 
   def save_prism_files(self):
     rounds_dir = f"{self.output_dir}/rounds/r{self.rounds}"
-    print(f"Save intermediate generated files to {rounds_dir}")
+    logging.info(f"Save intermediate generated files to {rounds_dir}")
     os.makedirs(rounds_dir, exist_ok=True)
     if os.path.isfile(self.prism_model_path):
         shutil.copy(self.prism_model_path, f"{rounds_dir}/{os.path.basename(self.prism_model_path)}")
@@ -372,7 +386,7 @@ def learn_mdp_and_strategy_from_sul(sul, input_alphabet, prism_model_path, prism
     smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000,
                                                             returnCEX=False)
     smc.run()
-    print(f'SUT value by final SMC with {smc.num_exec} executions: {smc.exec_count_satisfication / smc.num_exec}')
+    logging.info(f'SUT value by final SMC with {smc.num_exec} executions: {smc.exec_count_satisfication / smc.num_exec}')
 
     return learned_mdp, learned_strategy
 

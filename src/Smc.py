@@ -1,3 +1,5 @@
+import logging
+
 import numpy as np
 from scipy import stats
 from typing import Tuple, List
@@ -12,6 +14,7 @@ from StrategyBridge import StrategyBridge
 
 class StatisticalModelChecker:
     def __init__(self, mdp_sut : SUL, strategy_bridge : StrategyBridge, spec_path, sut_value, observation_table, num_exec=1000, max_exec_len=40, returnCEX=False):
+        self.log = logging.getLogger('StatisticalModelChecker')
         self.sut = mdp_sut
         self.strategy_bridge = strategy_bridge
         self.sut_value = sut_value
@@ -66,7 +69,7 @@ class StatisticalModelChecker:
                     return -1
 
             if (k + 1) % 1000 == 0:
-                print(f'SUT executed {k} times')
+                self.log.info(f'SUT executed {k} times')
 
         return None
 
