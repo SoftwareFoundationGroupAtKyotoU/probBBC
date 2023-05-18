@@ -1,9 +1,11 @@
+import logging
 import os
 import sys
 from os.path import abspath
 import argparse
 import aalpy.paths
 from ProbBlackBoxChecking import learn_mdp_and_strategy
+
 
 def initialize_argparse():
     parser = argparse.ArgumentParser()
@@ -27,10 +29,12 @@ def initialize_argparse():
 
     return parser
 
+
 def main():
     parser = initialize_argparse()
     args = parser.parse_args()
-
+    logging.basicConfig(format='%(asctime)s %(module)s[%(lineno)d] [%(levelname)s]: %(message)s',
+                        level=logging.INFO if not args.debug else logging.DEBUG)
     aalpy.paths.path_to_prism = args.prism_path
 
     output_dir = abspath(args.output_dir)
@@ -52,6 +56,7 @@ def main():
         smc_statistical_test_bound=args.smc_statistical_test_bound, debug=args.debug)
 
     print("Finish prob bbc")
+
 
 if __name__ == "__main__":
     main()
