@@ -60,13 +60,26 @@ def evaluate_properties(prism_file_name, properties_file_name, prism_adv_path, e
 def refine_ot_by_sample(sample, teacher):
     pass
 
-def sort_by_frequency(sample):
+def sort_by_frequency_counter(sample) -> collections.Counter:
     prefix_closed_sample = []
     for trace in sample:
         for i in range(2, len(trace) + 1, 2):
+            assert(len(trace[0:i]) % 2 == 0)
             prefix_closed_sample.append(tuple(trace[0:i]))
-    counter = collections.Counter(prefix_closed_sample)
-    return counter.most_common()
+    return collections.Counter(prefix_closed_sample)
+
+
+def sort_by_frequency_counter_in(sample) -> collections.Counter:
+    prefix_closed_sample = []
+    for trace in sample:
+        for i in range(1, len(trace) + 1, 2):
+            assert(len(trace[0:i]) % 2 == 1)
+            prefix_closed_sample.append(tuple(trace[0:i]))
+    return collections.Counter(prefix_closed_sample)
+
+
+def sort_by_frequency(sample):
+    return sort_by_frequency_counter(sample).most_common()
 
 def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
     def probability_on_mdp(trace, mdp):
@@ -98,6 +111,51 @@ def compare_frequency(satisfied_sample, total_sample, mdp, diff_bound=0.05):
                 population_size += 1
 
         sut_prob = freq / population_size
+
+        # 違う分布であれば反例として返す
+        # TODO: chernoff boundを使って評価する
+        if abs(mdp_prob - sut_prob) > diff_bound:
+            return exec_trace
+
+    # 反例が見つからなかった
+    return None
+
+
+def compare_frequency_with_tail(total_sample, mdp, diff_bound=0.05):
+    """
+    Try to construct an evidence of the deviation of hypothesis MDP using the last transition probabilities
+    """
+
+    def mdp_transit(trace, mdp, mdp_state=mdp.initial_state):
+        for action, observation in zip(trace[0::2], trace[1::2]):
+            for next_state, _ in mdp_state.transitions[action]:
+                if next_state.output == observation:
+                    mdp_state = next_state
+                    break
+        return mdp_state
+
+    def mdp_get_probability(mdp_state, action, observation) -> float:
+        for next_state, probability in mdp_state.transitions[action]:
+            if next_state.output == observation:
+                return probability
+        return 0
+
+    # Make total_sample prefix closed and count the frequency
+    cex_candidates = sort_by_frequency(total_sample)
+    prefix_counts = sort_by_frequency_counter_in(total_sample)
+    for (exec_trace, freq) in cex_candidates:
+        exec_trace = list(exec_trace)
+        prefix = exec_trace[0:-2]
+        last_action = exec_trace[-2]
+        prefix_with_action = exec_trace[0:-1]
+        last_observation = exec_trace[-1]
+        # Compute the state reached by prefix
+        mdp_state = mdp_transit(prefix, mdp)
+        mdp_prob = mdp_get_probability(mdp_state, last_action, last_observation)
+
+        prefix_with_action_frequency = prefix_counts[tuple(prefix_with_action)]
+        assert(freq <= prefix_with_action_frequency)
+        sut_prob = freq / prefix_with_action_frequency
 
         # 違う分布であれば反例として返す
         # TODO: chernoff boundを使って評価する
@@ -232,8 +290,9 @@ class ProbBBReachOracle(RandomWalkEqOracle) :
         if hyp_test_ret.pvalue < self.statistical_test_bound:
             # SMC実行中の実行列のサンプルとObservationTableから反例を見つける
             # TODO: 複数回のSMCのサンプルの和集合をtotal_sampleとして渡すこともできるようにする
-            print("Compare frequency between SMC sample and hypothesis.")
-            cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
+            logging.info("Compare frequency between SMC sample and hypothesis.")
+            # cex = compare_frequency(smc.satisfied_exec_sample, smc.exec_sample, mdp, self.statistical_test_bound)
+            cex = compare_frequency_with_tail(smc.exec_sample, mdp, self.statistical_test_bound)
             if cex != None:
                 print(f"CEX from compare_frequency : {cex}")
                 return cex
