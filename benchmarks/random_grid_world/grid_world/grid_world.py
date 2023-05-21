@@ -92,6 +92,9 @@ class GridWorld:
             Observations.Grass: 0.8,
             Observations.Sand: 0.75
         }
+        self.mud = []
+        self.grass = []
+        self.sand = []
 
         # Randomly decide holes. The initial state should not be a hole
         self.holes = []
@@ -112,44 +115,70 @@ class GridWorld:
 
         # Randomly sample mud states. Any mud must not be a hole nor a goal. The initial state should not be mud,
         # either. A state next to a mud state should not be a mud state
-        self.mud = []
         for _ in range(int(x_size * y_size * mud_ratio)):
             while True:
                 x_mud, y_mud = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
                 if (x_mud, y_mud) not in self.holes and (x_mud, y_mud) not in self.goals and (x_mud, y_mud) != (
-                        self.x_init, self.y_init):
-                    if (x_mud, y_mud) not in self.mud and (x_mud - 1, y_mud) not in self.mud and (
-                            x_mud + 1, y_mud) not in self.mud and (x_mud, y_mud - 1) not in self.mud and (
-                            x_mud, y_mud + 1) not in self.mud:
-                        self.mud.append((x_mud, y_mud))
+                        self.x_init, self.y_init) and self.to_observation(x_mud, y_mud) == Observations.Concrete:
+                    if self.noise_probability[self.to_observation(x_mud - 1, y_mud)] < 1.0:
+                        if (x_mud - 1, y_mud) in self.mud or (x_mud - 2, y_mud) in self.mud:
+                            break
+                    if self.noise_probability[self.to_observation(x_mud + 1, y_mud)] < 1.0:
+                        if (x_mud + 1, y_mud) in self.mud or (x_mud + 2, y_mud) in self.mud:
+                            break
+                    if self.noise_probability[self.to_observation(x_mud, y_mud - 1)] < 1.0:
+                        if (x_mud, y_mud - 1) in self.mud or (x_mud, y_mud - 2) in self.mud:
+                            break
+                    if self.noise_probability[self.to_observation(x_mud, y_mud + 1)] < 1.0:
+                        if (x_mud, y_mud + 1) in self.mud or (x_mud, y_mud + 2) in self.mud:
+                            break
+                    self.mud.append((x_mud, y_mud))
                     break
 
         # Randomly sample grass states. Any grass must not be a hole nor a goal. The initial state should not be grass,
         # either. A state next to a grass state should not be a grass state
-        self.grass = []
         for _ in range(int(x_size * y_size * grass_ratio)):
             while True:
                 x_grass, y_grass = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
                 if (x_grass, y_grass) not in self.holes and (x_grass, y_grass) not in self.goals and (
-                        x_grass, y_grass) != (self.x_init, self.y_init):
-                    if (x_grass, y_grass) not in self.grass and (x_grass - 1, y_grass) not in self.grass and (
-                            x_grass + 1, y_grass) not in self.grass and (x_grass, y_grass - 1) not in self.grass and (
-                            x_grass, y_grass + 1) not in self.grass:
-                        self.grass.append((x_grass, y_grass))
+                        x_grass, y_grass) != (self.x_init, self.y_init) and self.to_observation(x_grass, y_grass) == \
+                        Observations.Concrete:
+                    if self.noise_probability[self.to_observation(x_grass - 1, y_grass)] < 1.0:
+                        if (x_grass - 1, y_grass) in self.grass or (x_grass - 2, y_grass) in self.grass:
+                            break
+                    if self.noise_probability[self.to_observation(x_grass + 1, y_grass)] < 1.0:
+                        if (x_grass + 1, y_grass) in self.grass or (x_grass + 2, y_grass) in self.grass:
+                            break
+                    if self.noise_probability[self.to_observation(x_grass, y_grass - 1)] < 1.0:
+                        if (x_grass, y_grass - 1) in self.grass or (x_grass, y_grass - 2) in self.grass:
+                            break
+                    if self.noise_probability[self.to_observation(x_grass, y_grass + 1)] < 1.0:
+                        if (x_grass, y_grass + 1) in self.grass or (x_grass, y_grass + 2) in self.grass:
+                            break
+                    self.grass.append((x_grass, y_grass))
                     break
 
         # Randomly sample sand states. Any sand must not be a hole nor a goal. The initial state should not be sand,
         # either. A state next to a sand state should not be a sand state
-        self.sand = []
         for _ in range(int(x_size * y_size * sand_ratio)):
             while True:
                 x_sand, y_sand = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-                if (x_sand, y_sand) not in self.holes and (x_sand, y_sand) not in self.goals and (x_sand, y_sand) != (
-                        self.x_init, self.y_init):
-                    if (x_sand, y_sand) not in self.sand and (x_sand - 1, y_sand) not in self.sand and (
-                            x_sand + 1, y_sand) not in self.sand and (x_sand, y_sand - 1) not in self.sand and (
-                            x_sand, y_sand + 1) not in self.sand:
-                        self.sand.append((x_sand, y_sand))
+                if (x_sand, y_sand) not in self.holes and (x_sand, y_sand) not in self.goals and (
+                        x_sand, y_sand) != (self.x_init, self.y_init) and self.to_observation(x_sand, y_sand) == \
+                        Observations.Concrete:
+                    if self.noise_probability[self.to_observation(x_sand - 1, y_sand)] < 1.0:
+                        if (x_sand - 1, y_sand) in self.sand or (x_sand - 2, y_sand) in self.sand:
+                            break
+                    if self.noise_probability[self.to_observation(x_sand + 1, y_sand)] < 1.0:
+                        if (x_sand + 1, y_sand) in self.sand or (x_sand + 2, y_sand) in self.sand:
+                            break
+                    if self.noise_probability[self.to_observation(x_sand, y_sand - 1)] < 1.0:
+                        if (x_sand, y_sand - 1) in self.sand or (x_sand, y_sand - 2) in self.sand:
+                            break
+                    if self.noise_probability[self.to_observation(x_sand, y_sand + 1)] < 1.0:
+                        if (x_sand, y_sand + 1) in self.sand or (x_sand, y_sand + 2) in self.sand:
+                            break
+                    self.sand.append((x_sand, y_sand))
                     break
 
     def to_prism(self) -> str:
@@ -246,7 +275,11 @@ class GridWorld:
         targets = [(target_x, target_y)]
         if (target_x, target_y) not in self.holes and (target_x, target_y) not in self.goals and\
                 self.noise_probability[target_observation] < 1.0:
-            targets.extend([(target_x - dx, target_y - dy), (target_x + dx, target_y + dy)])
+            if self.to_observation(target_x - dx, target_y - dy) != target_observation:
+                targets.append((target_x - dx, target_y - dy))
+            if self.to_observation(target_x + dx, target_y + dy) != target_observation and self.to_observation(
+                    target_x - dx, target_y - dy) != self.to_observation(target_x + dx, target_y + dy):
+                targets.append((target_x + dx, target_y + dy))
 
         # Filter out wall states from the list of targets
         targets = [(tx, ty) for tx, ty in targets if 0 <= tx < self.x_size and 0 <= ty < self.y_size]
@@ -283,9 +316,9 @@ def main():
     parser.add_argument('--num_goal', type=int, default=1, help='Number of goals in the grid world')
     parser.add_argument('--hole_ratio', type=float, default=0.1,
                         help='Ratio of the number of hole cells to the total number of cells in the grid world')
-    parser.add_argument('--mud_ratio', type=float, default=0.2, help='The ratio of the number of mud cells')
-    parser.add_argument('--grass_ratio', type=float, default=0.2, help='The ratio of the number of grass cells')
-    parser.add_argument('--sand_ratio', type=float, default=0.2, help='The ratio of the number of sand cells')
+    parser.add_argument('--mud_ratio', type=float, default=0.3, help='The ratio of the number of mud cells')
+    parser.add_argument('--grass_ratio', type=float, default=0.3, help='The ratio of the number of grass cells')
+    parser.add_argument('--sand_ratio', type=float, default=0.3, help='The ratio of the number of sand cells')
     parser.add_argument('--seed', type=int, default=None, help='Random seed to ensure reproducibility')
     args = parser.parse_args()
 

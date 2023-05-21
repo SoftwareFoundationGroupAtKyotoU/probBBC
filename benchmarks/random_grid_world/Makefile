@@ -11,7 +11,7 @@ all: $(foreach size,$(SIZES),$(foreach num,$(NUM),$(size)/grid_world-$(size)-$(n
 %.prism: ./grid_world/grid_world.py
 	mkdir -p $(dir $@)
 	python3 $< --x_size $(word 1, $(subst x, ,$(dir $*))) --y_size $(word 2, $(subst /, ,$(subst x, ,$(dir $*)))) > $@
-	@if [ "$$($(PRISM) $@ ./grid_world.props | awk '/Result:/{print int($$2 * 2)}')" -lt 1 ]; then \
+	@if [ "$$($(PRISM) $@ ./grid_world-25.props | awk '/Result:/{print int($$2 * 2)}')" -lt 1 ]; then \
 		rm $@; \
 	elif [ "$$($(PRISM) $@ ./hole_reachable.props | awk '/Result:/{print $$2}')" != true ]; then \
 		rm $@; \
