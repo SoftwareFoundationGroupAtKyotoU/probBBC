@@ -34,6 +34,7 @@ def main():
     parser = initialize_argparse()
     args = parser.parse_args()
     logging.basicConfig(format='%(asctime)s %(module)s[%(lineno)d] [%(levelname)s]: %(message)s',
+                        stream=sys.stdout,
                         level=logging.INFO if not args.debug else logging.DEBUG)
     aalpy.paths.path_to_prism = args.prism_path
 
