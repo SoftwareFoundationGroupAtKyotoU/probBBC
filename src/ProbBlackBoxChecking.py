@@ -335,30 +335,44 @@ def learn_mdp_and_strategy(mdp_model_path, prism_model_path, prism_adv_path, pri
     input_alphabet = mdp.get_input_alphabet()
 
     sul = MdpSUL(mdp)
+    learn_mdp_and_strategy_from_sul(sul, input_alphabet, prism_model_path, prism_adv_path, prism_prop_path,
+                                    ltl_prop_path, automaton_type, n_c, n_resample, min_rounds, max_rounds, strategy,
+                                    cex_processing, stopping_based_on_prop, target_unambiguity, eq_num_steps,
+                                    smc_max_exec, smc_statistical_test_bound, only_classical_equivalence_testing,
+                                    samples_cex_strategy, output_dir, save_files_for_each_round, debug)
 
-    eq_oracle = ProbBBReachOracle(prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, input_alphabet, sul=sul,
-                                  smc_max_exec=smc_max_exec, statistical_test_bound=smc_statistical_test_bound,
+
+def learn_mdp_and_strategy_from_sul(sul, input_alphabet, prism_model_path, prism_adv_path, prism_prop_path,
+                                    ltl_prop_path, automaton_type='smm', n_c=20, n_resample=1000, min_rounds=20,
+                                    max_rounds=240, strategy='normal', cex_processing='longest_prefix',
+                                    stopping_based_on_prop=None, target_unambiguity=0.99, eq_num_steps=2000,
+                                    smc_max_exec=5000, smc_statistical_test_bound=0.025,
+                                    only_classical_equivalence_testing=False, samples_cex_strategy=None,
+                                    output_dir='results', save_files_for_each_round=False, debug=False):
+    eq_oracle = ProbBBReachOracle(prism_model_path, prism_adv_path, prism_prop_path, ltl_prop_path, input_alphabet,
+                                  sul=sul, smc_max_exec=smc_max_exec, statistical_test_bound=smc_statistical_test_bound,
                                   only_classical_equivalence_testing=only_classical_equivalence_testing,
-                                  num_steps=eq_num_steps, reset_prob=0.25, reset_after_cex=True,
-                                  output_dir=output_dir, save_files_for_each_round=save_files_for_each_round, debug=debug)
+                                  num_steps=eq_num_steps, reset_prob=0.25, reset_after_cex=True, output_dir=output_dir,
+                                  save_files_for_each_round=save_files_for_each_round, debug=debug)
     # EQOracleChain
-    print_level=2
+    print_level = 2
     if debug:
-        print_level=3
+        print_level = 3
     learned_mdp = run_stochastic_Lstar(input_alphabet=input_alphabet, eq_oracle=eq_oracle, sul=sul, n_c=n_c,
                                        n_resample=n_resample, min_rounds=min_rounds, max_rounds=max_rounds,
                                        automaton_type=automaton_type, strategy=strategy, cex_processing=cex_processing,
                                        samples_cex_strategy=samples_cex_strategy, target_unambiguity=target_unambiguity,
-                                       property_based_stopping=stopping_based_on_prop, custom_oracle=True, print_level=print_level)
+                                       property_based_stopping=stopping_based_on_prop, custom_oracle=True,
+                                       print_level=print_level)
 
     learned_strategy = eq_oracle.learned_strategy
 
-    sb = StrategyBridge(prism_adv_path, eq_oracle.exportstates_path, eq_oracle.exporttrans_path, eq_oracle.exportlabels_path)
-    smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000, returnCEX=False)
+    sb = StrategyBridge(prism_adv_path, eq_oracle.exportstates_path, eq_oracle.exporttrans_path,
+                        eq_oracle.exportlabels_path)
+    smc : StatisticalModelChecker = StatisticalModelChecker(sul, sb, ltl_prop_path, 0, None, num_exec=5000,
+                                                            returnCEX=False)
     smc.run()
     print(f'SUT value by final SMC with {smc.num_exec} executions: {smc.exec_count_satisfication / smc.num_exec}')
 
     return learned_mdp, learned_strategy
-
-
 
