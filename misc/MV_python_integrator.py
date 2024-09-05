@@ -78,7 +78,7 @@ class MyModel(ABC):
         return self.number_of_steps
 
     def eval(self, observation):
-        if self.current_output == None:
+        if self.current_output is None:
             return 0
         else:
             # MDPの出力は次のような文字列 'agree__six__c1_tails__c2_tails'

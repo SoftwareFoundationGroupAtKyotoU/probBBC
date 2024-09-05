@@ -61,11 +61,14 @@ class SMCTestCase(unittest.TestCase):
         custom_print(smc.spec_monitor)
 
         smc.reset_sut()
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
 
         0

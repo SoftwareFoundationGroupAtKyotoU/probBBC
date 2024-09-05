@@ -380,7 +380,7 @@ class ProbBBReachOracle(RandomWalkEqOracle):
         if not self.only_classical_equivalence_testing:
             logging.info(f"CEX from SMC: {cex}")
 
-            if cex != -1 and cex != None:
+            if cex != -1 and cex is not None:
                 # 具体的な反例が得られればそれを返す
                 return cex
 
@@ -407,7 +407,7 @@ class ProbBBReachOracle(RandomWalkEqOracle):
                 cex = compare_frequency_with_tail(
                     smc.exec_sample, mdp, self.statistical_test_bound
                 )
-                if cex != None:
+                if cex is not None:
                     logging.info(f"CEX from compare_frequency : {cex}")
                     return cex
                 logging.info("Could not find counterexample by compare_frequency.")
