@@ -1,13 +1,9 @@
 import sys
 import os
-import math
 import numpy as np
-import matplotlib
 from matplotlib import pyplot as plt
 
 # Gaussian process regression
-from sklearn.gaussian_process import GaussianProcessRegressor
-from sklearn.gaussian_process.kernels import WhiteKernel, RBF
 
 stat_file = sys.argv[1]
 baseline_file = sys.argv[2]

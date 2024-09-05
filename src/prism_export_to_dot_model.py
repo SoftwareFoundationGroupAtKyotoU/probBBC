@@ -49,7 +49,7 @@ def main():
                         name = name_of_labels[idx]
                         if name == "init":
                             initial_state = m[1]
-                        if not name in except_names:
+                        if name not in except_names:
                             label_names.append(name)
                     labels[m[1]] = "__".join(label_names)
 

@@ -1,7 +1,6 @@
 import re
 import random
-import numpy as np
-from typing import Dict, Tuple, Set, List
+from typing import Dict, Tuple, List
 
 # Stateは多分本当はint
 State = int

@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from abc import ABC
-import sys, random
+import sys
 import socket
 import pickle
 import copy
 from py4j.java_gateway import JavaGateway, GatewayParameters, CallbackServerParameters
-from aalpy.base import Automaton, AutomatonState
 from aalpy.SULs import MdpSUL
 from aalpy.utils import load_automaton_from_file
 from StrategyBridge import StrategyBridge
@@ -24,8 +23,8 @@ class MyModel(ABC):
         )
         self.sul = MdpSUL(mdp)
         # == デバッグ用 ==
-        self.prism_model_path = f"/Users/bo40/workspace/python/mc_exp.prism"
-        self.prism_adv_path = f"/Users/bo40/workspace/python/adv.tra"
+        self.prism_model_path = "/Users/bo40/workspace/python/mc_exp.prism"
+        self.prism_adv_path = "/Users/bo40/workspace/python/adv.tra"
         # ====
         self.strategy_bridge = StrategyBridge(
             self.prism_adv_path, self.prism_model_path

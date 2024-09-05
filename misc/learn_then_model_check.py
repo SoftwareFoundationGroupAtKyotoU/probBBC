@@ -4,11 +4,7 @@ from aalpy.SULs import MdpSUL
 from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
 from aalpy.utils import (
-    visualize_automaton,
     load_automaton_from_file,
-    model_check_experiment,
-    get_properties_file,
-    get_correct_prop_values,
     mdp_2_prism_format,
 )
 from aalpy.automata.StochasticMealyMachine import smm_to_mdp_conversion

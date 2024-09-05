@@ -1,5 +1,4 @@
 from aalpy.utils import (
-    load_automaton_from_file,
     save_automaton_to_file,
     visualize_automaton,
     generate_random_dfa,

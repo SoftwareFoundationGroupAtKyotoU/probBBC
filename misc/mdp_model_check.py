@@ -4,7 +4,6 @@ from aalpy.SULs import MdpSUL
 from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
 from aalpy.utils import (
-    visualize_automaton,
     load_automaton_from_file,
     model_check_experiment,
     get_properties_file,

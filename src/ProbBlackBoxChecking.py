@@ -3,22 +3,17 @@ import re
 import collections
 import os
 import shutil
-from sys import prefix
-from typing import List
 import aalpy.paths
-from aalpy.base import Oracle, SUL
+from aalpy.base import SUL
 from aalpy.automata import StochasticMealyMachine
 from aalpy.SULs import MdpSUL
-from aalpy.oracles import RandomWalkEqOracle, RandomWordEqOracle
+from aalpy.oracles import RandomWalkEqOracle
 from aalpy.learning_algs import run_stochastic_Lstar
 from aalpy.utils import (
     load_automaton_from_file,
     mdp_2_prism_format,
-    get_properties_file,
-    get_correct_prop_values,
 )
 from aalpy.automata.StochasticMealyMachine import smm_to_mdp_conversion
-from aalpy.utils.HelperFunctions import print_observation_table
 
 from Smc import StatisticalModelChecker
 from StrategyBridge import StrategyBridge

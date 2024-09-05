@@ -4,8 +4,8 @@ from ..StrategyBridge import StrategyBridge
 
 class StrategyBridgeTestCase(unittest.TestCase):
     def test_initialize(self):
-        sample_prism_model = f"/Users/bo40/workspace/python/mc_exp_sample.prism"
-        sample_prism_adv = f"/Users/bo40/workspace/python/adv_sample.tra"
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
         self.assertEqual(sb.initial_state, 0)
@@ -25,8 +25,8 @@ class StrategyBridgeTestCase(unittest.TestCase):
         )
 
     def test_next(self):
-        sample_prism_model = f"/Users/bo40/workspace/python/mc_exp_sample.prism"
-        sample_prism_adv = f"/Users/bo40/workspace/python/adv_sample.tra"
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
         self.assertEqual(sb.next_action(), "go2")
@@ -38,8 +38,8 @@ class StrategyBridgeTestCase(unittest.TestCase):
         # self.assertEqual(sb.history, [("go2", 'agree__c1_tails__c2_tails__six'), ("go2", 'agree__c1_tails__c2_tails__five')])
 
     def test_reset(self):
-        sample_prism_model = f"/Users/bo40/workspace/python/mc_exp_sample.prism"
-        sample_prism_adv = f"/Users/bo40/workspace/python/adv_sample.tra"
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
         sb.update_state("go2", "agree__c1_tails__c2_tails__six")
@@ -52,8 +52,8 @@ class StrategyBridgeTestCase(unittest.TestCase):
         # self.assertEqual(sb.history, [])
 
     def test_update_state_false(self):
-        sample_prism_model = f"/Users/bo40/workspace/python/mc_exp_sample.prism"
-        sample_prism_adv = f"/Users/bo40/workspace/python/adv_sample.tra"
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
         # TODO : implement this test
