@@ -5,19 +5,19 @@ import argparse
 
 
 class Actions(IntEnum):
-    North = 0,  # Moving up on the grid
-    South = 1,  # Moving down on the grid
-    West = 2,  # Moving left on the grid
+    North = (0,)  # Moving up on the grid
+    South = (1,)  # Moving down on the grid
+    West = (2,)  # Moving left on the grid
     East = 3  # Moving right on the grid
 
 
 class Observations(IntEnum):
-    Concrete = 0,  # Represents a normal, navigable cell
-    Hole = 1,  # Represents a hole cell where movement stops
-    Wall = 2,  # Represents an encountered wall, i.e., a border of the grid
-    Goal = 3,  # Represents a goal cell
-    Mud = 4,
-    Grass = 5,
+    Concrete = (0,)  # Represents a normal, navigable cell
+    Hole = (1,)  # Represents a hole cell where movement stops
+    Wall = (2,)  # Represents an encountered wall, i.e., a border of the grid
+    Goal = (3,)  # Represents a goal cell
+    Mud = (4,)
+    Grass = (5,)
     Sand = 6
 
 
@@ -63,8 +63,17 @@ class GridWorld:
     Class to represent a grid world environment
     """
 
-    def __init__(self, x_size: int, y_size: int, hole_ratio: float = 0.1, num_goal: int = 1, mud_ratio: float = 0.2,
-                 grass_ratio: float = 0.2, sand_ratio: float = 0.2, seed: Optional[int] = None):
+    def __init__(
+        self,
+        x_size: int,
+        y_size: int,
+        hole_ratio: float = 0.1,
+        num_goal: int = 1,
+        mud_ratio: float = 0.2,
+        grass_ratio: float = 0.2,
+        sand_ratio: float = 0.2,
+        seed: Optional[int] = None,
+    ):
         """
         Randomly construct a grid world.
 
@@ -90,7 +99,7 @@ class GridWorld:
             Observations.Goal: 1.0,
             Observations.Mud: 0.6,
             Observations.Grass: 0.8,
-            Observations.Sand: 0.75
+            Observations.Sand: 0.75,
         }
         self.mud = []
         self.grass = []
@@ -99,17 +108,29 @@ class GridWorld:
         # Randomly decide holes. The initial state should not be a hole
         self.holes = []
         for _ in range(int(x_size * y_size * hole_ratio)):
-            x_hole, y_hole = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-            if (x_hole, y_hole) not in self.holes and (x_hole, y_hole) != (self.x_init, self.y_init):
+            x_hole, y_hole = (
+                random.randint(0, x_size - 1),
+                random.randint(0, y_size - 1),
+            )
+            if (x_hole, y_hole) not in self.holes and (x_hole, y_hole) != (
+                self.x_init,
+                self.y_init,
+            ):
                 self.holes.append((x_hole, y_hole))
 
         # Randomly decide goals. Any goal must not be a hole. The initial state should not be a hole, either.
         self.goals = []
         while len(self.goals) < num_goal:
             while True:
-                x_goal, y_goal = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-                if (x_goal, y_goal) not in self.goals and (x_goal, y_goal) not in self.holes and (x_goal, y_goal) != (
-                        self.x_init, self.y_init):
+                x_goal, y_goal = (
+                    random.randint(0, x_size - 1),
+                    random.randint(0, y_size - 1),
+                )
+                if (
+                    (x_goal, y_goal) not in self.goals
+                    and (x_goal, y_goal) not in self.holes
+                    and (x_goal, y_goal) != (self.x_init, self.y_init)
+                ):
                     self.goals.append((x_goal, y_goal))
                     break
 
@@ -117,20 +138,51 @@ class GridWorld:
         # either. A state next to a mud state should not be a mud state
         for _ in range(int(x_size * y_size * mud_ratio)):
             while True:
-                x_mud, y_mud = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-                if (x_mud, y_mud) not in self.holes and (x_mud, y_mud) not in self.goals and (x_mud, y_mud) != (
-                        self.x_init, self.y_init) and self.to_observation(x_mud, y_mud) == Observations.Concrete:
-                    if self.noise_probability[self.to_observation(x_mud - 1, y_mud)] < 1.0:
-                        if (x_mud - 1, y_mud) in self.mud or (x_mud - 2, y_mud) in self.mud:
+                x_mud, y_mud = (
+                    random.randint(0, x_size - 1),
+                    random.randint(0, y_size - 1),
+                )
+                if (
+                    (x_mud, y_mud) not in self.holes
+                    and (x_mud, y_mud) not in self.goals
+                    and (x_mud, y_mud) != (self.x_init, self.y_init)
+                    and self.to_observation(x_mud, y_mud) == Observations.Concrete
+                ):
+                    if (
+                        self.noise_probability[self.to_observation(x_mud - 1, y_mud)]
+                        < 1.0
+                    ):
+                        if (x_mud - 1, y_mud) in self.mud or (
+                            x_mud - 2,
+                            y_mud,
+                        ) in self.mud:
                             break
-                    if self.noise_probability[self.to_observation(x_mud + 1, y_mud)] < 1.0:
-                        if (x_mud + 1, y_mud) in self.mud or (x_mud + 2, y_mud) in self.mud:
+                    if (
+                        self.noise_probability[self.to_observation(x_mud + 1, y_mud)]
+                        < 1.0
+                    ):
+                        if (x_mud + 1, y_mud) in self.mud or (
+                            x_mud + 2,
+                            y_mud,
+                        ) in self.mud:
                             break
-                    if self.noise_probability[self.to_observation(x_mud, y_mud - 1)] < 1.0:
-                        if (x_mud, y_mud - 1) in self.mud or (x_mud, y_mud - 2) in self.mud:
+                    if (
+                        self.noise_probability[self.to_observation(x_mud, y_mud - 1)]
+                        < 1.0
+                    ):
+                        if (x_mud, y_mud - 1) in self.mud or (
+                            x_mud,
+                            y_mud - 2,
+                        ) in self.mud:
                             break
-                    if self.noise_probability[self.to_observation(x_mud, y_mud + 1)] < 1.0:
-                        if (x_mud, y_mud + 1) in self.mud or (x_mud, y_mud + 2) in self.mud:
+                    if (
+                        self.noise_probability[self.to_observation(x_mud, y_mud + 1)]
+                        < 1.0
+                    ):
+                        if (x_mud, y_mud + 1) in self.mud or (
+                            x_mud,
+                            y_mud + 2,
+                        ) in self.mud:
                             break
                     self.mud.append((x_mud, y_mud))
                     break
@@ -139,21 +191,59 @@ class GridWorld:
         # either. A state next to a grass state should not be a grass state
         for _ in range(int(x_size * y_size * grass_ratio)):
             while True:
-                x_grass, y_grass = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-                if (x_grass, y_grass) not in self.holes and (x_grass, y_grass) not in self.goals and (
-                        x_grass, y_grass) != (self.x_init, self.y_init) and self.to_observation(x_grass, y_grass) == \
-                        Observations.Concrete:
-                    if self.noise_probability[self.to_observation(x_grass - 1, y_grass)] < 1.0:
-                        if (x_grass - 1, y_grass) in self.grass or (x_grass - 2, y_grass) in self.grass:
+                x_grass, y_grass = (
+                    random.randint(0, x_size - 1),
+                    random.randint(0, y_size - 1),
+                )
+                if (
+                    (x_grass, y_grass) not in self.holes
+                    and (x_grass, y_grass) not in self.goals
+                    and (x_grass, y_grass) != (self.x_init, self.y_init)
+                    and self.to_observation(x_grass, y_grass) == Observations.Concrete
+                ):
+                    if (
+                        self.noise_probability[
+                            self.to_observation(x_grass - 1, y_grass)
+                        ]
+                        < 1.0
+                    ):
+                        if (x_grass - 1, y_grass) in self.grass or (
+                            x_grass - 2,
+                            y_grass,
+                        ) in self.grass:
                             break
-                    if self.noise_probability[self.to_observation(x_grass + 1, y_grass)] < 1.0:
-                        if (x_grass + 1, y_grass) in self.grass or (x_grass + 2, y_grass) in self.grass:
+                    if (
+                        self.noise_probability[
+                            self.to_observation(x_grass + 1, y_grass)
+                        ]
+                        < 1.0
+                    ):
+                        if (x_grass + 1, y_grass) in self.grass or (
+                            x_grass + 2,
+                            y_grass,
+                        ) in self.grass:
                             break
-                    if self.noise_probability[self.to_observation(x_grass, y_grass - 1)] < 1.0:
-                        if (x_grass, y_grass - 1) in self.grass or (x_grass, y_grass - 2) in self.grass:
+                    if (
+                        self.noise_probability[
+                            self.to_observation(x_grass, y_grass - 1)
+                        ]
+                        < 1.0
+                    ):
+                        if (x_grass, y_grass - 1) in self.grass or (
+                            x_grass,
+                            y_grass - 2,
+                        ) in self.grass:
                             break
-                    if self.noise_probability[self.to_observation(x_grass, y_grass + 1)] < 1.0:
-                        if (x_grass, y_grass + 1) in self.grass or (x_grass, y_grass + 2) in self.grass:
+                    if (
+                        self.noise_probability[
+                            self.to_observation(x_grass, y_grass + 1)
+                        ]
+                        < 1.0
+                    ):
+                        if (x_grass, y_grass + 1) in self.grass or (
+                            x_grass,
+                            y_grass + 2,
+                        ) in self.grass:
                             break
                     self.grass.append((x_grass, y_grass))
                     break
@@ -162,21 +252,51 @@ class GridWorld:
         # either. A state next to a sand state should not be a sand state
         for _ in range(int(x_size * y_size * sand_ratio)):
             while True:
-                x_sand, y_sand = random.randint(0, x_size - 1), random.randint(0, y_size - 1)
-                if (x_sand, y_sand) not in self.holes and (x_sand, y_sand) not in self.goals and (
-                        x_sand, y_sand) != (self.x_init, self.y_init) and self.to_observation(x_sand, y_sand) == \
-                        Observations.Concrete:
-                    if self.noise_probability[self.to_observation(x_sand - 1, y_sand)] < 1.0:
-                        if (x_sand - 1, y_sand) in self.sand or (x_sand - 2, y_sand) in self.sand:
+                x_sand, y_sand = (
+                    random.randint(0, x_size - 1),
+                    random.randint(0, y_size - 1),
+                )
+                if (
+                    (x_sand, y_sand) not in self.holes
+                    and (x_sand, y_sand) not in self.goals
+                    and (x_sand, y_sand) != (self.x_init, self.y_init)
+                    and self.to_observation(x_sand, y_sand) == Observations.Concrete
+                ):
+                    if (
+                        self.noise_probability[self.to_observation(x_sand - 1, y_sand)]
+                        < 1.0
+                    ):
+                        if (x_sand - 1, y_sand) in self.sand or (
+                            x_sand - 2,
+                            y_sand,
+                        ) in self.sand:
                             break
-                    if self.noise_probability[self.to_observation(x_sand + 1, y_sand)] < 1.0:
-                        if (x_sand + 1, y_sand) in self.sand or (x_sand + 2, y_sand) in self.sand:
+                    if (
+                        self.noise_probability[self.to_observation(x_sand + 1, y_sand)]
+                        < 1.0
+                    ):
+                        if (x_sand + 1, y_sand) in self.sand or (
+                            x_sand + 2,
+                            y_sand,
+                        ) in self.sand:
                             break
-                    if self.noise_probability[self.to_observation(x_sand, y_sand - 1)] < 1.0:
-                        if (x_sand, y_sand - 1) in self.sand or (x_sand, y_sand - 2) in self.sand:
+                    if (
+                        self.noise_probability[self.to_observation(x_sand, y_sand - 1)]
+                        < 1.0
+                    ):
+                        if (x_sand, y_sand - 1) in self.sand or (
+                            x_sand,
+                            y_sand - 2,
+                        ) in self.sand:
                             break
-                    if self.noise_probability[self.to_observation(x_sand, y_sand + 1)] < 1.0:
-                        if (x_sand, y_sand + 1) in self.sand or (x_sand, y_sand + 2) in self.sand:
+                    if (
+                        self.noise_probability[self.to_observation(x_sand, y_sand + 1)]
+                        < 1.0
+                    ):
+                        if (x_sand, y_sand + 1) in self.sand or (
+                            x_sand,
+                            y_sand + 2,
+                        ) in self.sand:
                             break
                     self.sand.append((x_sand, y_sand))
                     break
@@ -193,11 +313,11 @@ class GridWorld:
 
     def to_header(self) -> str:
         # Function to generate the PRISM code header, which includes state variables and their initialization
-        result = 'mdp\n'
-        result += 'module random_grid_world\n'
-        result += f'  x : [0..{self.x_size}] init {self.x_init};\n'
-        result += f'  y : [0..{self.y_size}] init {self.y_init};\n'
-        result += '  output : [0..6] init 0;\n'
+        result = "mdp\n"
+        result += "module random_grid_world\n"
+        result += f"  x : [0..{self.x_size}] init {self.x_init};\n"
+        result += f"  y : [0..{self.y_size}] init {self.y_init};\n"
+        result += "  output : [0..6] init 0;\n"
         return result
 
     def to_state(self, x: int, y: int) -> str:
@@ -212,9 +332,13 @@ class GridWorld:
         for action in Actions:
             transitions = self.make_next(x, y, action)
             transitions_str = " + ".join(
-                [next_str(prob, next_x, next_y, obs) for prob, next_x, next_y, obs in transitions])
+                [
+                    next_str(prob, next_x, next_y, obs)
+                    for prob, next_x, next_y, obs in transitions
+                ]
+            )
             lines.append(f"  [{action.name}] (x={x}) & (y={y}) -> {transitions_str};")
-        return "\n".join(lines) + '\n\n'
+        return "\n".join(lines) + "\n\n"
 
     def to_observation(self, x: int, y: int) -> Observations:
         if (x, y) in self.holes:
@@ -231,7 +355,9 @@ class GridWorld:
             observation = Observations.Concrete
         return observation
 
-    def make_next(self, x: int, y: int, action: Actions) -> List[Tuple[float, int, int, Observations]]:
+    def make_next(
+        self, x: int, y: int, action: Actions
+    ) -> List[Tuple[float, int, int, Observations]]:
         """
         Generate the possible next states given current position (x, y) and action.
 
@@ -256,16 +382,33 @@ class GridWorld:
                  the transition probability, next_x, next_y, and the corresponding observation
         """
         if (x, y) in self.holes or (x, y) in self.goals:
-            return [(1.0, x, y, Observations.Hole if (x, y) in self.holes else Observations.Goal)]
+            return [
+                (
+                    1.0,
+                    x,
+                    y,
+                    Observations.Hole if (x, y) in self.holes else Observations.Goal,
+                )
+            ]
 
         next_states = []
-        action_to_delta = {Actions.North: (0, -1), Actions.South: (0, 1), Actions.West: (-1, 0), Actions.East: (1, 0)}
+        action_to_delta = {
+            Actions.North: (0, -1),
+            Actions.South: (0, 1),
+            Actions.West: (-1, 0),
+            Actions.East: (1, 0),
+        }
 
         dx, dy = action_to_delta[action]
         target_x, target_y = x + dx, y + dy
 
         # If the target state is a wall, stay in the current state
-        if target_x < 0 or target_x >= self.x_size or target_y < 0 or target_y >= self.y_size:
+        if (
+            target_x < 0
+            or target_x >= self.x_size
+            or target_y < 0
+            or target_y >= self.y_size
+        ):
             next_states.append((1.0, x, y, Observations.Wall))
             return next_states
 
@@ -273,16 +416,26 @@ class GridWorld:
 
         # Define the list of target states and their corresponding observations
         targets = [(target_x, target_y)]
-        if (target_x, target_y) not in self.holes and (target_x, target_y) not in self.goals and\
-                self.noise_probability[target_observation] < 1.0:
+        if (
+            (target_x, target_y) not in self.holes
+            and (target_x, target_y) not in self.goals
+            and self.noise_probability[target_observation] < 1.0
+        ):
             if self.to_observation(target_x - dx, target_y - dy) != target_observation:
                 targets.append((target_x - dx, target_y - dy))
-            if self.to_observation(target_x + dx, target_y + dy) != target_observation and self.to_observation(
-                    target_x - dx, target_y - dy) != self.to_observation(target_x + dx, target_y + dy):
+            if self.to_observation(
+                target_x + dx, target_y + dy
+            ) != target_observation and self.to_observation(
+                target_x - dx, target_y - dy
+            ) != self.to_observation(target_x + dx, target_y + dy):
                 targets.append((target_x + dx, target_y + dy))
 
         # Filter out wall states from the list of targets
-        targets = [(tx, ty) for tx, ty in targets if 0 <= tx < self.x_size and 0 <= ty < self.y_size]
+        targets = [
+            (tx, ty)
+            for tx, ty in targets
+            if 0 <= tx < self.x_size and 0 <= ty < self.y_size
+        ]
 
         for tx, ty in targets:
             # Determine the observation of the target state
@@ -292,13 +445,15 @@ class GridWorld:
             if (tx, ty) == (target_x, target_y):
                 probability = self.noise_probability[target_observation]
             else:
-                probability = (1.0 - self.noise_probability[target_observation]) / (len(targets) - 1)
+                probability = (1.0 - self.noise_probability[target_observation]) / (
+                    len(targets) - 1
+                )
 
             next_states.append((probability, tx, ty, observation))
 
         return next_states
 
-    footer = 'endmodule\n'
+    footer = "endmodule\n"
     # The positions of holes
     holes: List[Tuple[int, int]]
     # The positions of goals
@@ -310,20 +465,55 @@ def main():
     The entry point for grid world generation. It prints the resulting grid world generated by the parameters given
     as arguments.
     """
-    parser = argparse.ArgumentParser(description='Generate a grid world.')
-    parser.add_argument('--x_size', type=int, required=True, help='Number of columns in the grid world')
-    parser.add_argument('--y_size', type=int, required=True, help='Number of rows in the grid world')
-    parser.add_argument('--num_goal', type=int, default=1, help='Number of goals in the grid world')
-    parser.add_argument('--hole_ratio', type=float, default=0.1,
-                        help='Ratio of the number of hole cells to the total number of cells in the grid world')
-    parser.add_argument('--mud_ratio', type=float, default=0.3, help='The ratio of the number of mud cells')
-    parser.add_argument('--grass_ratio', type=float, default=0.3, help='The ratio of the number of grass cells')
-    parser.add_argument('--sand_ratio', type=float, default=0.3, help='The ratio of the number of sand cells')
-    parser.add_argument('--seed', type=int, default=None, help='Random seed to ensure reproducibility')
+    parser = argparse.ArgumentParser(description="Generate a grid world.")
+    parser.add_argument(
+        "--x_size", type=int, required=True, help="Number of columns in the grid world"
+    )
+    parser.add_argument(
+        "--y_size", type=int, required=True, help="Number of rows in the grid world"
+    )
+    parser.add_argument(
+        "--num_goal", type=int, default=1, help="Number of goals in the grid world"
+    )
+    parser.add_argument(
+        "--hole_ratio",
+        type=float,
+        default=0.1,
+        help="Ratio of the number of hole cells to the total number of cells in the grid world",
+    )
+    parser.add_argument(
+        "--mud_ratio",
+        type=float,
+        default=0.3,
+        help="The ratio of the number of mud cells",
+    )
+    parser.add_argument(
+        "--grass_ratio",
+        type=float,
+        default=0.3,
+        help="The ratio of the number of grass cells",
+    )
+    parser.add_argument(
+        "--sand_ratio",
+        type=float,
+        default=0.3,
+        help="The ratio of the number of sand cells",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None, help="Random seed to ensure reproducibility"
+    )
     args = parser.parse_args()
 
-    grid_world = GridWorld(args.x_size, args.y_size, args.hole_ratio, args.num_goal, args.mud_ratio, args.grass_ratio,
-                           args.sand_ratio, args.seed)
+    grid_world = GridWorld(
+        args.x_size,
+        args.y_size,
+        args.hole_ratio,
+        args.num_goal,
+        args.mud_ratio,
+        args.grass_ratio,
+        args.sand_ratio,
+        args.seed,
+    )
     print(grid_world.to_prism())
 
 

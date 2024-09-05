@@ -6,20 +6,24 @@ from typing import Dict, Tuple, Set, List
 # Stateは多分本当はint
 State = int
 Action = str
-Observation = str # モデルの出力ラベルの集合
+Observation = str  # モデルの出力ラベルの集合
+
 
 # strategyと実システム(MDP)の組み合わせ
 # (Σin × Σout)* → Dist(Σin) という型のplayer側の戦略を作る
 class StrategyBridge:
-
     def __init__(self, strategy_path, states_path, trans_path, labels_path):
         self.initial_state = 0
         # 状態sにいる確率が current_state[s]
         self.current_state: Dict[State, float] = dict()
-        self.strategy: Dict[State, Action] = dict()# adv.traから得られたもの
-        self.observation_map: Dict[State, Observation] = dict() # .prismから得られたもの
+        self.strategy: Dict[State, Action] = dict()  # adv.traから得られたもの
+        self.observation_map: Dict[State, Observation] = (
+            dict()
+        )  # .prismから得られたもの
         # 本当はこんなに複雑じゃなくて良いかも
-        self.next_state: Dict[Tuple[State, Action, Observation], Dict[State, float]] = dict() # adv.traから得られたもの
+        self.next_state: Dict[Tuple[State, Action, Observation], Dict[State, float]] = (
+            dict()
+        )  # adv.traから得られたもの
         # self.history : List[Tuple[Action, Observation]] = []
 
         self.__init_state_and_observation(labels_path)
@@ -27,11 +31,11 @@ class StrategyBridge:
         self.states = set(self.strategy.keys())
         self.actions = set(self.strategy.values())
         self.current_state = {self.initial_state: 1.0}
-        self.empty_dist : Dict[Action, float] = dict.fromkeys(self.actions, 0.0)
-        self.actions_list : List[Action] = list(self.empty_dist.keys())
+        self.empty_dist: Dict[Action, float] = dict.fromkeys(self.actions, 0.0)
+        self.actions_list: List[Action] = list(self.empty_dist.keys())
 
     def next_action(self) -> Action:
-        dist : Dict[Action, float] = self.empty_dist.copy()
+        dist: Dict[Action, float] = self.empty_dist.copy()
         is_empty_dist = True
         for state, weight in self.current_state.items():
             # self.strategy[state] : strategyでstateに対応づけられているアクション
@@ -41,7 +45,7 @@ class StrategyBridge:
         # actionがsampleされる確率がdist[action]というサンプリング
         prob_dist = list(dist.values())
 
-        action : Action = ""
+        action: Action = ""
         if is_empty_dist:
             action = random.choice(self.actions_list)
         else:
@@ -73,7 +77,7 @@ class StrategyBridge:
                 else:
                     # TODO: found counterexample?
                     # if weight > 0:
-                        # print("update_state(found_counter example?)" + str(state) + "," + action + "," + observation)
+                    # print("update_state(found_counter example?)" + str(state) + "," + action + "," + observation)
                     pass
         # new_stateの正規化
         prob_sum = sum(new_state.values())
@@ -120,19 +124,22 @@ class StrategyBridge:
                             if label_idx in labels_name:
                                 label_name = labels_name[label_idx]
                             else:
-                                label_name = 'unknownobservation'
+                                label_name = "unknownobservation"
                             if int(state) in self.observation_map:
                                 self.observation_map[int(state)].append(label_name)
                             else:
                                 self.observation_map[int(state)] = [label_name]
         for k in self.observation_map.keys():
-            self.observation_map[k] = StrategyBridge.__sort_observation(self.observation_map[k])
-
+            self.observation_map[k] = StrategyBridge.__sort_observation(
+                self.observation_map[k]
+            )
 
     # PRISMの反例ファイルを読み込んで strategyとnext_stateを初期化する
     def __init_strategy(self, strategy_path, trans_path):
         regex = re.compile(r"(\d+) \d\.?\d* (\d+) (\d\.?\d*) (\w+)")
-        next_state_temp : Dict[Tuple[State, Action, Observation], Dict[State, float]] = dict()
+        next_state_temp: Dict[Tuple[State, Action, Observation], Dict[State, float]] = (
+            dict()
+        )
         with open(strategy_path) as f:
             for line in f:
                 match = regex.match(line)
@@ -165,11 +172,11 @@ class StrategyBridge:
         self.next_state = dict()
         for k, prob_map in next_state_temp.items():
             prob_sum = sum(prob_map.values())
-            dist : Dict[State, float] = dict()
+            dist: Dict[State, float] = dict()
             for s, prob in prob_map.items():
                 dist[s] = prob / prob_sum
             self.next_state[k] = dist
 
     # observation_aps (APの集合) をAPの辞書順で整列させ、"__"で連結した文字列として返す
-    def __sort_observation(observation_aps : List[str]) -> Observation:
+    def __sort_observation(observation_aps: List[str]) -> Observation:
         return "__".join(sorted(observation_aps))
