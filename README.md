@@ -152,5 +152,8 @@ If you want to run ProbBBC without strategy-guided equivalence testing (for exam
 python3 src/main.py --model-file benchmarks/mqtt/mqtt.dot --prop-file benchmarks/mqtt/mqtt.props --prism-path /usr/bin/prism --output-dir results --min-rounds 100 --max-rounds 120 --save-files-for-each-round --target-unambiguity 0.99
 ```
 
+### Formatter
+Please run `ruff check && ruff format` and apply the changes before making commit.
+
 ### License
 This software is released under the BSD-2 License. See LICENSE file for details.

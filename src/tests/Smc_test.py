@@ -6,15 +6,16 @@ from ..Smc import StatisticalModelChecker
 from aalpy.SULs import MdpSUL
 from aalpy.utils import load_automaton_from_file
 
+
 def custom_print(aut):
     bdict = aut.get_dict()
     print("Acceptance:", aut.get_acceptance())
     print("Number of sets:", aut.num_sets())
     print("Number of states: ", aut.num_states())
     print("Initial states: ", aut.get_init_state_number())
-    print("Atomic propositions:", end='')
+    print("Atomic propositions:", end="")
     for ap in aut.ap():
-        print(' ', ap, ' (=', bdict.varnum(ap), ')', sep='', end='')
+        print(" ", ap, " (=", bdict.varnum(ap), ")", sep="", end="")
     print()
     # Templated methods are not available in Python, so we cannot
     # retrieve/attach arbitrary objects from/to the automaton.  However the
@@ -41,49 +42,58 @@ def custom_print(aut):
             print("    label =", spot.bdd_format_formula(bdict, t.cond))
             print("    acc sets =", t.acc)
 
+
 class SMCTestCase(unittest.TestCase):
     def test_initialize(self):
-        example = 'shared_coin'
-        mdp = load_automaton_from_file(f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot', automaton_type='mdp')
+        example = "shared_coin"
+        mdp = load_automaton_from_file(
+            f"/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot",
+            automaton_type="mdp",
+        )
         sul = MdpSUL(mdp)
-        sample_prism_model = f'/Users/bo40/workspace/python/mc_exp_sample.prism'
-        sample_prism_adv = f'/Users/bo40/workspace/python/adv_sample.tra'
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
-        spec_path = f'/Users/bo40/workspace/python/sandbox/shared_coin.ltl'
+        spec_path = "/Users/bo40/workspace/python/sandbox/shared_coin.ltl"
         smc = StatisticalModelChecker(sul, sb, spec_path)
 
         custom_print(smc.spec_monitor)
 
         smc.reset_sut()
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
-        ret = smc.one_step()
+        # XXX: unused
+        # ret = smc.one_step()
         smc.step_monitor(smc.current_output)
 
         0
 
     def test_smc_run(self):
-        example = 'shared_coin'
-        mdp = load_automaton_from_file(f'/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot', automaton_type='mdp')
+        example = "shared_coin"
+        mdp = load_automaton_from_file(
+            f"/Users/bo40/workspace/python/AALpy/DotModels/MDPs/{example}.dot",
+            automaton_type="mdp",
+        )
         sul = MdpSUL(mdp)
-        sample_prism_model = f'/Users/bo40/workspace/python/mc_exp_sample.prism'
-        sample_prism_adv = f'/Users/bo40/workspace/python/adv_sample.tra'
+        sample_prism_model = "/Users/bo40/workspace/python/mc_exp_sample.prism"
+        sample_prism_adv = "/Users/bo40/workspace/python/adv_sample.tra"
         sb = StrategyBridge(sample_prism_adv, sample_prism_model)
 
-        spec_path = f'/Users/bo40/workspace/python/sandbox/shared_coin.ltl'
+        spec_path = "/Users/bo40/workspace/python/sandbox/shared_coin.ltl"
         smc = StatisticalModelChecker(sul, sb, spec_path, num_exec=5000)
 
         smc.run()
-        print(f'sat : {smc.exec_count_satisfication}')
-        print(f'vio : {smc.exec_count_violation}')
-        ret = smc.hypothesis_testing(0.29, 'two-sided')
-        print(f'pvalue : {ret.pvalue}')
+        print(f"sat : {smc.exec_count_satisfication}")
+        print(f"vio : {smc.exec_count_violation}")
+        ret = smc.hypothesis_testing(0.29, "two-sided")
+        print(f"pvalue : {ret.pvalue}")
         0
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()
