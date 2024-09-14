@@ -1,0 +1,87 @@
+name: Integration test on macos
+on: [push, pull_request]
+env:
+  PRISM-VERSION: 4.8.1-mac64-arm
+  SPOT-VERSION: 2.12
+  AALPY-VERSION: v.1.4.1
+jobs:
+  test-on-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: check Python3 version
+        run: python3 --version
+
+      - name: Download Prism
+        run: |
+          wget https://www.prismmodelchecker.org/dl/prism-${{ env.PRISM-VERSION }}.tar.gz
+          tar xfz prism-${{ env.PRISM-VERSION }}.tar.gz
+          cd prism-${{ env.PRISM-VERSION }}
+          ./install.sh
+
+      # Building spot takes time, so we cache it.
+      - name: Cache Spot
+        id: cache-spot
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-spot
+        with:
+          path: spot-${{ env.SPOT-VERSION }}
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ env.SPOT-VERSION }}
+      - if: ${{ steps.cache-spot.outputs.cache-hit != 'true' }}
+        name: Build Spot
+        run: |
+          ## Download the source code of spot
+          wget http://www.lrde.epita.fr/dload/spot/spot-${{ env.SPOT-VERSION }}.tar.gz
+          tar xvf spot-${{ env.SPOT-VERSION }}.tar.gz
+          cd spot-${{ env.SPOT-VERSION }}
+          # Specify appropriate CPU/OS for your environment
+          ./configure --prefix "$OLDPWD/.venv/"
+          # Build Spot
+          make -j8
+
+      - name: Set-up Python venv
+        run: python3 -m venv .venv
+      - name: Install spot
+        run: |
+          cd spot-${{ env.SPOT-VERSION }}
+          make install
+      - name: Check spot installation
+        run: |
+          . .venv/bin/activate
+          python3 -c "import spot"
+      - name: Install AALpy
+        run: |
+          git clone https://github.com/DES-Lab/AALpy -b ${{ env.AALPY-VERSION }} --depth 1
+          . .venv/bin/activate
+          cd AALpy
+          patch -p1 < ../aalpy.patch
+          python3 -m pip install pydot
+          python3 -m pip install setuptools
+          python3 setup.py install
+          echo "XXX: debug: pip list after install aalpy"
+          python3 -m pip list
+      - name: Check AALpy installation
+        run: |
+          . .venv/bin/activate
+          python3 -c "import aalpy"
+      - name: Install other packages
+        run: |
+          . .venv/bin/activate
+          pip install -r requirements.txt
+
+      - name: Run src/main.py as an integration test
+        run: |
+          . .venv/bin/activate
+          python3 src/main.py \
+            --model-file benchmarks/mqtt/mqtt.dot \
+            --prop-file benchmarks/mqtt/mqtt.props \
+            --prism-path "$(pwd)/prism-${{ env.PRISM-VERSION }}/bin/prism" \
+            --output-dir result \
+            --min-rounds 3 \
+            --max-rounds 5 \
+            --save-files-for-each-round \
+            --target-unambiguity 0.99
+
