@@ -76,9 +76,9 @@ ProbBBC depends on [Spot](https://spot.lre.epita.fr/) for handling LTL formulas.
 
 ```shell
 ## Download the source code of spot
-wget http://www.lrde.epita.fr/dload/spot/spot-2.11.5.tar.gz
-tar xvf spot-2.11.5.tar.gz
-cd spot-2.11.5
+wget http://www.lrde.epita.fr/dload/spot/spot-2.12.tar.gz
+tar xvf spot-2.12.tar.gz
+cd spot-2.12
 # Specify appropriate CPU/OS for your environment
 ./configure --prefix "$OLDPWD/.venv/" --build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu
 # Build and install Spot
