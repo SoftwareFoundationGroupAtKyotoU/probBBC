@@ -101,7 +101,9 @@ class StatisticalModelChecker:
 
     def reset_sut(self):
         self.number_of_steps = 0
-        self.current_output = self.sut.pre()
+        # XXX: Temporary fix for integration test. Need to be checked.
+        self.sut.pre()
+        self.current_output = self.sut.step(None)
         self.current_output_aps = self.current_output.split("__")
         self.strategy_bridge.reset()
         self.exec_trace = []
